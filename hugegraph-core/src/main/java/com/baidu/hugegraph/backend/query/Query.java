@@ -43,18 +43,19 @@ public class Query implements Cloneable {
 
     public static final long NO_CAPACITY = -1L;
     public static final long DEFAULT_CAPACITY = 800000L; // HugeGraph-777
-
+    //当前线程的容量上下文
     private static final ThreadLocal<Long> capacityContext = new ThreadLocal<>();
 
     protected static final Query NONE = new Query(HugeType.UNKNOWN);
 
     private HugeType resultType;
     private Map<HugeKeys, Order> orders;
-    private long offset;
-    private long actualOffset;
-    private long limit;
+    //以下为分页逻辑参数
+    private long offset;    //起点
+    private long actualOffset;  ////起点
+    private long limit;    //由起点的增量
     private String page;
-    private long capacity;
+    private long capacity;  //查询结果上限
     private boolean showHidden;
     private boolean showDeleting;
 
@@ -147,6 +148,10 @@ public class Query implements Cloneable {
         this.offset = offset;
     }
 
+    /**
+     * 最上级Query的actualOffset
+     * @return
+     */
     public long actualOffset() {
         if (this.originQuery != null) {
             return this.rootOriginQuery().actualOffset();
@@ -154,6 +159,11 @@ public class Query implements Cloneable {
         return this.actualOffset;
     }
 
+    /**
+     * this.actualOffset += offset; 跳过offset个
+     * @param offset
+     * @return
+     */
     public long skipOffset(long offset) {
         E.checkArgument(offset >= 0L, "Invalid offset value: %s", offset);
         if (this.originQuery != null) {
@@ -248,8 +258,10 @@ public class Query implements Cloneable {
         // Update limit
         if (end != -1L) {
             if (!this.nolimit()) {
+                //如果有限制，则取最小的
                 end = Math.min(end, offset + this.limit());
             } else {
+                //如果无限制，则直接取end
                 assert end < Query.NO_LIMIT;
             }
             E.checkArgument(end >= start,
@@ -261,6 +273,11 @@ public class Query implements Cloneable {
         }
     }
 
+    /**
+     * page： limit!=0,offset=0
+     * no page:
+     * @return
+     */
     public String page() {
         if (this.page != null) {
             E.checkState(this.limit() != 0L,
@@ -296,6 +313,12 @@ public class Query implements Cloneable {
         return this.capacity == NO_CAPACITY || this.capacity > DEFAULT_CAPACITY;
     }
 
+    /**
+     * check count 是否超过 this.capacity
+     * capacity 限制 查询结果容量
+     * @param count 查询结果数量
+     * @throws LimitExceedException
+     */
     public void checkCapacity(long count) throws LimitExceedException {
         // Throw LimitExceedException if reach capacity
         if (this.capacity != Query.NO_CAPACITY && count > this.capacity) {
@@ -334,6 +357,10 @@ public class Query implements Cloneable {
         return ImmutableSet.of();
     }
 
+    /**
+     * 查询要素信息包含：ids()、conditions()
+     * @return
+     */
     public boolean empty() {
         return this.ids().isEmpty() && this.conditions().isEmpty();
     }
@@ -350,17 +377,25 @@ public class Query implements Cloneable {
         }
     }
 
+    /**
+     * 比较query对象
+     * @param object
+     * @return
+     */
     @Override
     public boolean equals(Object object) {
         if (!(object instanceof Query)) {
             return false;
         }
         Query other = (Query) object;
+        //以下为查询对象的所有属性
+                //查询结构控制要素
         return this.resultType.equals(other.resultType) &&
                this.orders().equals(other.orders()) &&
                this.offset == other.offset &&
                this.limit == other.limit &&
                Objects.equals(this.page, other.page) &&
+                //查询信息要素
                this.ids().equals(other.ids()) &&
                this.conditions().equals(other.conditions());
     }
@@ -376,6 +411,10 @@ public class Query implements Cloneable {
                this.conditions().hashCode();
     }
 
+    /**
+     * 拼接查询内容
+     * @return
+     */
     @Override
     public String toString() {
         Map<String, Object> pairs = InsertionOrderUtil.newMap();
@@ -435,6 +474,10 @@ public class Query implements Cloneable {
         return capacity != null ? capacity : DEFAULT_CAPACITY;
     }
 
+    /**
+     * @param count 查询结果数量
+     * @throws LimitExceedException
+     */
     public final static void checkForceCapacity(long count)
                                                 throws LimitExceedException {
         if (count > Query.DEFAULT_CAPACITY) {
