@@ -58,22 +58,32 @@ public class ContextGremlinServer extends GremlinServer {
         }
     }
 
+    /**
+     * traversal与graph绑定，使用prefix名称与graph名称组合的方式，生成全局唯一名称
+     * gName全局名称，绑定g与graph
+     * @param prefix 前缀
+     */
     public void injectTraversalSource(String prefix) {
         GraphManager manager = this.getServerGremlinExecutor()
                                    .getGraphManager();
         for (String graph : manager.getGraphNames()) {
             GraphTraversalSource g = manager.getGraph(graph).traversal();
-            String gName = prefix + graph;
+            String gName = prefix + graph;      //gName全局别名
             if (manager.getTraversalSource(gName) != null) {
                 throw new HugeException(
                           "Found existing name '%s' in global bindings, " +
                           "it may lead to gremlin query error.", gName);
             }
             // Add a traversal source for all graphs with customed rule.
-            manager.putTraversalSource(gName, g);
+            manager.putTraversalSource(gName, g);   //别名与g绑定
         }
     }
 
+    /**
+     * 创建gremlin server线程池
+     * @param settings
+     * @return
+     */
     static ExecutorService newGremlinExecutorService(Settings settings) {
         if (settings.gremlinPool == 0) {
             settings.gremlinPool = Runtime.getRuntime().availableProcessors();

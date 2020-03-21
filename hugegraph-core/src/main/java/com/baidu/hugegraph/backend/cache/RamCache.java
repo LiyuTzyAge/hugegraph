@@ -70,7 +70,11 @@ public class RamCache implements Cache {
         this.keyLock = new KeyLock();
         this.capacity = capacity;
         this.halfCapacity = this.capacity >> 1;
-
+        // capacity 为预估缓存元素个数
+        // initialCapacity 为预估bulk个数，为了保证ConcurrentHashMap性能
+        //capacity 如果大于等于 1MB个，则除以1024，每个bulk存放1024个对象
+        //如果小于1MB个，则只有256个bulk，则每个bulk存放4096
+        //bulk个数 最大100MB个
         int initialCapacity = capacity >= MB ? capacity >> 10 : 256;
         if (initialCapacity > MAX_INIT_CAP) {
             initialCapacity = MAX_INIT_CAP;
@@ -80,10 +84,18 @@ public class RamCache implements Cache {
         this.queue = new LinkedQueueNonBigLock<>();
     }
 
+    /**
+     * 查询id对应的缓存
+     * 如果map容量超过half，则将访问过的对象移到queue末尾
+     * @param id
+     * @return
+     */
     @Watched(prefix = "ramcache")
     private final Object access(Id id) {
         assert id != null;
-
+        //缓存空间一般时
+        // 直接查询map
+        // 不修改LRU链  // NOTE: update the queue only if the size > capacity/2
         if (this.map.size() <= this.halfCapacity) {
             LinkNode<Id, Object> node = this.map.get(id);
             if (node == null) {
@@ -92,7 +104,7 @@ public class RamCache implements Cache {
             assert id.equals(node.key());
             return node.value();
         }
-
+        //当容量大于一半时，会有数据删除和修改，需要锁保证
         final Lock lock = this.keyLock.lock(id);
         try {
             LinkNode<Id, Object> node = this.map.get(id);
@@ -105,8 +117,10 @@ public class RamCache implements Cache {
                 // Move the node from mid to tail
                 if (this.queue.remove(node) == null) {
                     // The node may be removed by others through dequeue()
-                    return null;
+                    // 什么情况?? --》map中的数据与queue中不一致。存在map中存在，但queue中不存在的情况
+                    return null; //如果被删除了，则直接返回null，不会放回到queue中
                 }
+                //如果queue中存在，则移到尾部
                 this.queue.enqueue(node);
             }
 
@@ -117,6 +131,11 @@ public class RamCache implements Cache {
         }
     }
 
+    /**
+     * 将对象写入缓存末尾，或更新已有的id并写入末尾
+     * @param id
+     * @param value
+     */
     @Watched(prefix = "ramcache")
     private final void write(Id id, Object value) {
         assert id != null;
@@ -131,6 +150,8 @@ public class RamCache implements Cache {
                  * NOTE: it maybe return null if someone else (that's other
                  * threads) are doing dequeue() and the queue may be empty.
                  */
+                //因为dequeue使用while方式获取lock，会存在让出线程时间，被其他线程使用，并且只有
+                //queue空的时候才会返回null
                 LinkNode<Id, Object> removed = this.queue.dequeue();
                 if (removed == null) {
                     /*
@@ -138,7 +159,7 @@ public class RamCache implements Cache {
                      * be cleared in the map, but still stay in the queue, so
                      * the queue will have some more nodes than the map.
                      */
-                    this.map.clear();
+                    this.map.clear(); //queue 数据多于map
                     break;
                 }
                 /*
@@ -171,6 +192,10 @@ public class RamCache implements Cache {
         }
     }
 
+    /**
+     * 删除缓存
+     * @param id
+     */
     @Watched(prefix = "ramcache")
     private final void remove(Id id) {
         if (id == null) {
@@ -193,6 +218,11 @@ public class RamCache implements Cache {
         }
     }
 
+    /**
+     * 查询缓存，统计hits与miss
+     * @param id
+     * @return
+     */
     @Watched(prefix = "ramcache")
     @Override
     public Object get(Id id) {
@@ -200,6 +230,15 @@ public class RamCache implements Cache {
             return null;
         }
         Object value = null;
+        /*
+        map容量小于一半，可以直接查询，开销不大
+        map容量大于一半,查询开销大，先初略判断map中是否有缓存
+        ，如果map中没有则一定没有，再access查询缓存value，
+        可能返回null，因为在并发环境中，存在查询时被其他线程
+        删除的可能
+         */
+        //containsKey避免没在缓存中，还要access（lock开销大）
+        //为什么不直接map.get 因为需要access维护LRU链的功能
         if (this.map.size() <= this.halfCapacity || this.map.containsKey(id)) {
             // Maybe the id removed by other threads and returned null value
             value = this.access(id);
@@ -221,6 +260,12 @@ public class RamCache implements Cache {
         return value;
     }
 
+    /**
+     * 查询缓存，不存在则调用fetcher获取对象
+     * @param id
+     * @param fetcher
+     * @return
+     */
     @Watched(prefix = "ramcache")
     @Override
     public Object getOrFetch(Id id, Function<Id, Object> fetcher) {
@@ -320,6 +365,10 @@ public class RamCache implements Cache {
         return this.expire;
     }
 
+    /**
+     * 清理过期缓存，需要手动触发
+     * @return 清理缓存个数
+     */
     @Override
     public long tick() {
         long expireTime = this.expire;
@@ -344,11 +393,19 @@ public class RamCache implements Cache {
         return expireItems;
     }
 
+    /**
+     * 缓存容量 元素个数
+     * @return
+     */
     @Override
     public long capacity() {
         return this.capacity;
     }
 
+    /**
+     * 缓存中实际 元素个数
+     * @return
+     */
     @Override
     public long size() {
         return this.map.size();
@@ -459,6 +516,7 @@ public class RamCache implements Cache {
 
         /**
          * Dump keys of all nodes in this queue (just for debug)
+         * 由head开始向后遍历所有node，返回keys
          */
         private List<K> dumpKeys() {
             List<K> keys = new LinkedList<>();
@@ -488,6 +546,7 @@ public class RamCache implements Cache {
          * Check whether there is circular reference (just for debug)
          * NOTE: but it is important to note that this is only key check
          * rather than pointer check.
+         * 查找循环引用
          */
         @SuppressWarnings("unused")
         private boolean checkPrevNotInNext(LinkNode<K, V> self) {
@@ -499,6 +558,7 @@ public class RamCache implements Cache {
             List<K> keys = this.dumpKeys();
             int prevPos = keys.indexOf(prev.key());
             int selfPos = keys.indexOf(self.key());
+            //单项有序链 判断循环引用方法，prevPos必须在selfPos前面
             if (prevPos > selfPos && selfPos != -1) {
                 throw new RuntimeException(String.format(
                           "Expect %s should be before %s, actual %s",
@@ -529,15 +589,18 @@ public class RamCache implements Cache {
                 /*
                  * If someone is removing the last node by remove(),
                  * it will update the rear.prev, so we should lock it.
+                 * 如果有人正在remove最后的元素，则rear.prev将会被修改，所以需要lock last元素
                  */
                 LinkNode<K, V> last = this.rear.prev;
-
+                //锁定 防止clear过程中，竞争访问this.head, last, this.rear
                 List<Lock> locks = this.lock(this.head, last, this.rear);
                 try {
                     if (last != this.rear.prev) {
+                        //同步之前可能有变动，步骤，释放锁（有可能其他线程在做相同的事情），更新last，重新lock
                         // The rear.prev has changed, try to get lock again
                         continue;
                     }
+                    //清空queue
                     this.reset();
                 } finally {
                     this.unlock(locks);
@@ -606,6 +669,12 @@ public class RamCache implements Cache {
                     return null;
                 }
 
+                //不需要lock  first.next吗？
+                //因为queue的操作是有规则的，remove某个node时，必须获取prev的lock，
+                // 这样当有线程要修改first.next时，必须先lock first，每一个操作都会
+                //判断前一个元素状态，就能起到lock隔离的作用
+                //同时node.prev的修改只能由 前一个元素进行，不会有其他情况，所以有了前一个元素的锁，
+                // 就能隔离对node.prev的操作
                 List<Lock> locks = this.lock(this.head, first);
                 try {
                     if (first != this.head.next) {
@@ -616,6 +685,7 @@ public class RamCache implements Cache {
                     // Break the link between the head and `first`
                     assert first.next != null;
                     this.head.next = first.next;
+
                     first.next.prev = this.head;
 
                     // Clear the links of the first node
@@ -637,13 +707,14 @@ public class RamCache implements Cache {
             assert node != this.head && node != this.rear;
 
             while (true) {
+                //没有同步，不确定node.prev返回的正确的
                 LinkNode<K, V> prev = node.prev;
                 if (prev == this.empty) {
                     assert node.next == this.empty;
                     // Ignore the node if it has been removed
                     return null;
                 }
-
+                //同步后，比较数据是否一致，如果不一致重新获取
                 List<Lock> locks = this.lock(prev, node);
                 try {
                     if (prev != node.prev) {

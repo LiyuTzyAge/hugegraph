@@ -49,8 +49,14 @@ public class EdgeId implements Id {
     private final Id edgeLabelId;
     private final String sortValues;
     private final Id otherVertexId;
-
+    /*
+    是否定向的，决定EdgeId两种字符串输出格式；
+    true-> ownerVertexId>directionType>edgelabel>sortValues>otherVertexId
+    false->srcId>edgelabel>sortValues>targeteId
+    EdgeId对象中存在4位、5位类型的Id，但在存储端只有4位EdgeId
+     */
     private final boolean directed;
+    //EdgeId字符串表示形式
     private String cache;
 
     public EdgeId(HugeVertex ownerVertex, Directions direction,
@@ -76,6 +82,10 @@ public class EdgeId implements Id {
         this.cache = null;
     }
 
+    /**
+     * 翻转，A->B => B<-A
+     * @return
+     */
     public EdgeId switchDirection() {
         Directions direction = this.direction.opposite();
         return new EdgeId(this.otherVertexId, direction, this.edgeLabelId,
@@ -123,6 +133,10 @@ public class EdgeId implements Id {
         return this.otherVertexId;
     }
 
+    /**
+     * id字符串内容
+     * @return
+     */
     @Override
     public Object asObject() {
         return this.asString();
@@ -155,11 +169,19 @@ public class EdgeId implements Id {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * 字符串UTF-8编码
+     * @return
+     */
     @Override
     public byte[] asBytes() {
         return StringEncoding.encode(this.asString());
     }
 
+    /**
+     * id字符串长度
+     * @return
+     */
     @Override
     public int length() {
         return this.asString().length();
@@ -170,6 +192,11 @@ public class EdgeId implements Id {
         return IdType.EDGE;
     }
 
+    /**
+     * 字符串顺序比较
+     * @param other
+     * @return
+     */
     @Override
     public int compareTo(Id other) {
         return this.asString().compareTo(other.asString());
@@ -194,6 +221,11 @@ public class EdgeId implements Id {
         return this.asString();
     }
 
+    /**
+     * 方向对象转码->HugeType
+     * @param direction
+     * @return
+     */
     public static byte directionToCode(Directions direction) {
         return direction.type().code();
     }
@@ -202,6 +234,12 @@ public class EdgeId implements Id {
         return Directions.convert(HugeType.fromCode(code));
     }
 
+    /**
+     * 根据字符串重构EdgeId对象
+     * @param id
+     * @return
+     * @throws NotFoundException
+     */
     public static EdgeId parse(String id) throws NotFoundException {
         String[] idParts = split(id);
         if (!(idParts.length == 4 || idParts.length == 5)) {
@@ -233,6 +271,13 @@ public class EdgeId implements Id {
         }
     }
 
+    /**
+     * 解析存储端id字符串
+     * id在存储端经过编码
+     * 存储端EdgeId只有4位
+     * @param id
+     * @return
+     */
     public static Id parseStoredString(String id) {
         String[] idParts = split(id);
         E.checkArgument(idParts.length == 4, "Invalid id format: %s", id);
@@ -244,6 +289,12 @@ public class EdgeId implements Id {
                           sortValues, otherVertexId);
     }
 
+    /**
+     * 转换为存储端id字符串
+     * 将id字符串编码
+     * @param id
+     * @return
+     */
     public static String asStoredString(Id id) {
         EdgeId eid = (EdgeId) id;
         return SplicingIdGenerator.concat(

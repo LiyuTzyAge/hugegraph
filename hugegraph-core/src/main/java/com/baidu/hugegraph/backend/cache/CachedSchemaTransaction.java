@@ -40,13 +40,13 @@ import com.baidu.hugegraph.util.Events;
 import com.google.common.collect.ImmutableSet;
 
 public final class CachedSchemaTransaction extends SchemaTransaction {
-
+    //缓存schema对象，idCache根据id缓存，nameCache根据name缓存，两者内容相同，一同维护
     private final Cache idCache;
     private final Cache nameCache;
 
     private EventListener storeEventListener;
     private EventListener cacheEventListener;
-
+    //记录缓存中有哪些HugeType，只用于getAllSchema方法
     private final Map<HugeType, Boolean> cachedTypes;
 
     public CachedSchemaTransaction(HugeGraph graph, BackendStore store) {
@@ -60,6 +60,9 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         this.listenChanges();
     }
 
+    /**
+     * 关闭schemaTransaction
+     */
     @Override
     public void close() {
         try {
@@ -75,9 +78,19 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         final String name = prefix + "-" + super.graph().name();
         final int capacity = conf.get(CoreOptions.SCHEMA_CACHE_CAPACITY);
         // NOTE: must disable schema cache-expire due to getAllSchema()
+        //expire是由CacheManager默认指定的 ？？？？
         return CacheManager.instance().cache(name, capacity);
     }
 
+    /**
+     * 监听store与cache事件
+     * 如果STORE_INIT、STORE_CLEAR、STORE_TRUNCATE
+     * 如果cache.invalid、cache.clear
+     * 则
+     * this.idCache.clear();
+     * this.nameCache.clear();
+     * this.cachedTypes.clear();
+     */
     private void listenChanges() {
         // Listen store event: "store.init", "store.clear", ...
         Set<String> storeEvents = ImmutableSet.of(Events.STORE_INIT,
@@ -94,6 +107,7 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
             }
             return false;
         };
+        //注册存储事件监听
         this.store().provider().listen(this.storeEventListener);
 
         // Listen cache event: "cache"(invalid cache item)
@@ -103,6 +117,7 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
             event.checkArgs(String.class, Id.class);
             Object[] args = event.args();
             if ("invalid".equals(args[0])) {
+                //无效某个缓存数据
                 Id id = (Id) args[1];
                 Object value = this.idCache.get(id);
                 if (value != null) {
@@ -124,12 +139,16 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
             }
             return false;
         };
+        //注册缓存事件监听
         EventHub schemaEventHub = this.graph().schemaEventHub();
         if (!schemaEventHub.containsListener(Events.CACHE)) {
             schemaEventHub.listen(Events.CACHE, this.cacheEventListener);
         }
     }
 
+    /**
+     * 解除监听
+     */
     private void unlistenChanges() {
         // Unlisten store event
         this.store().provider().unlisten(this.storeEventListener);
@@ -139,6 +158,12 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         schemaEventHub.unlisten(Events.CACHE, this.cacheEventListener);
     }
 
+    /**
+     * 现象：
+     * idCache达到capacity，则this.cachedTypes.clear()，再getAllSchema时就不会遍历idCache，
+     * 而是查询底层，并过滤出type，并更新idCache和nameCache
+     * 用意为何？
+     */
     private void resetCachedAllIfReachedCapacity() {
         if (this.idCache.size() >= this.idCache.capacity()) {
             LOG.warn("Schema cache reached capacity({}): {}",
@@ -157,6 +182,10 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         return IdGenerator.of(type.string() + "-" + name);
     }
 
+    /**
+     * 写入schema新对象
+     * @param schema
+     */
     @Override
     protected void addSchema(SchemaElement schema) {
         super.addSchema(schema);
@@ -170,16 +199,25 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         this.nameCache.update(prefixedName, schema);
     }
 
+    /**
+     * 查询schema
+     * @param type
+     * @param id
+     * @param <T>
+     * @return
+     */
     @Override
     @SuppressWarnings("unchecked")
     protected <T extends SchemaElement> T getSchema(HugeType type, Id id) {
         Id prefixedId = generateId(type, id);
         Object value = this.idCache.get(prefixedId);
+        //如果缓存中存在则直接返回，不能保证与底层一致-》（这是分布式共用存储数据的问题）
         if (value == null) {
+            //缓存中没有，从底层中查询
             value = super.getSchema(type, id);
             if (value != null) {
                 this.resetCachedAllIfReachedCapacity();
-
+                //由底层查询的数据保证最新，直接更新缓存
                 this.idCache.update(prefixedId, value);
 
                 SchemaElement schema = (SchemaElement) value;
@@ -211,6 +249,10 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         return (T) value;
     }
 
+    /**
+     * 删除缓存中的schema对象，是否需要同步给底层，如何实现的？
+     * @param schema
+     */
     @Override
     protected void removeSchema(SchemaElement schema) {
         super.removeSchema(schema);
@@ -226,6 +268,14 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
         }
     }
 
+    /**
+     * 查询HugeType下的所有schema对象
+     * 如果 类型已经被缓存了，则直接由缓存返回结果
+     * 如果 类型没有被缓存，则由地城查询并缓存结果
+     * @param type
+     * @param <T>
+     * @return
+     */
     @Override
     protected <T extends SchemaElement> List<T> getAllSchema(HugeType type) {
         Boolean cachedAll = this.cachedTypes.getOrDefault(type, false);
@@ -241,7 +291,7 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
             });
             return results;
         } else {
-            List<T> results = super.getAllSchema(type);
+            List<T> results = super.getAllSchema(type); //由底层查询
             long free = this.idCache.capacity() - this.idCache.size();
             if (results.size() <= free) {
                 // Update cache
@@ -252,6 +302,7 @@ public final class CachedSchemaTransaction extends SchemaTransaction {
                     Id prefixedName = generateId(schema.type(), schema.name());
                     this.nameCache.update(prefixedName, schema);
                 }
+                //只有在getAllSchema时才会缓存HugeType类型
                 this.cachedTypes.putIfAbsent(type, true);
             }
             return results;

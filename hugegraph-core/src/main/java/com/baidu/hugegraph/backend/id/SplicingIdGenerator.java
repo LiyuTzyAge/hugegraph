@@ -44,10 +44,10 @@ public class SplicingIdGenerator extends IdGenerator {
      * "\^$.|?*+()[{"
      * See: http://www.regular-expressions.info/characters.html
      */
-    private static final char ESCAPE = '`';
-    private static final char IDS_SPLITOR = '>';
-    private static final char ID_SPLITOR = ':';
-    private static final char NAME_SPLITOR = '!';
+    private static final char ESCAPE = '`';     //转义字符
+    private static final char IDS_SPLITOR = '>';    //多个ID分隔符
+    private static final char ID_SPLITOR = ':';     //ID内部分隔符
+    private static final char NAME_SPLITOR = '!';   //属性名称分隔符
 
     public static final String ESCAPE_STR = String.valueOf(ESCAPE);
     public static final String IDS_SPLITOR_STR = String.valueOf(IDS_SPLITOR);
@@ -66,8 +66,11 @@ public class SplicingIdGenerator extends IdGenerator {
          * if needed.
          * id = String.format("%s%s%s", HashUtil.hash(id), ID_SPLITOR, id);
          */
+        //为了数据均匀分布使用在头添加hash值
         // TODO: use binary Id with binary fields instead of string id
         return splicing(vertex.schemaLabel().id().asString(), vertex.name());
+        //Only primary key vertex has name, [label:name]
+
     }
 
     /**
@@ -91,6 +94,7 @@ public class SplicingIdGenerator extends IdGenerator {
 
     /**
      * Concat property values with NAME_SPLITOR
+     * 使用场景：生成主键名称，主键由多个属性组成时，需要拼接成一个，以NAME_SPLITOR分隔
      * @param values the property values to be concatted
      * @return       concatted string value
      */
@@ -115,6 +119,7 @@ public class SplicingIdGenerator extends IdGenerator {
 
     /**
      * Concat multiple parts into a single id with ID_SPLITOR
+     * 拼接生成id,以ID_SPLITOR分隔，{label ID_SPLITOR name}
      * @param parts the string id values to be spliced
      * @return      spliced id object
      */

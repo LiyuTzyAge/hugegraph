@@ -28,6 +28,11 @@ import com.baidu.hugegraph.backend.serializer.BytesBuffer;
 
 public final class IdUtil {
 
+    /**
+     * Id写到存储端添加前缀
+     * @param id
+     * @return
+     */
     public static String writeStoredString(Id id) {
         String idString;
         switch (id.type()) {
@@ -45,6 +50,11 @@ public final class IdUtil {
         return id.type().prefix() + idString;
     }
 
+    /**
+     * 读取存储端Id，去掉前缀
+     * @param id
+     * @return
+     */
     public static Id readStoredString(String id) {
         IdType type = IdType.valueOfPrefix(id);
         String idContent = id.substring(1);
@@ -60,23 +70,48 @@ public final class IdUtil {
         }
     }
 
+    /**
+     * 将Id转换成ByteBuffer，添加前缀
+     * @param id
+     * @return
+     */
     public static Object writeBinString(Id id) {
+        //+1,添加前缀
         int len = id.edge() ? BytesBuffer.BUF_EDGE_ID : id.length() + 1;
         BytesBuffer buffer = BytesBuffer.allocate(len).writeId(id);
         buffer.flip();
         return buffer.asByteBuffer();
     }
 
+    /**
+     * 将ByteBuffer转换成Id
+     * @param id
+     * @return
+     */
     public static Id readBinString(Object id) {
         BytesBuffer buffer = BytesBuffer.wrap((ByteBuffer) id);
         return buffer.readId();
     }
 
+    /**
+     * Id转字符串，添加前缀
+     * @param id
+     * @return
+     */
     public static String writeString(Id id) {
         return "" + id.type().prefix() + id.asObject();
     }
 
+    /**
+     * 根据Id字符串转换成对象
+     * 去掉前缀
+     * L12312312
+     * Sabderc
+     * @param id
+     * @return
+     */
     public static Id readString(String id) {
+        //根据id前缀判断id类型
         IdType type = IdType.valueOfPrefix(id);
         String idContent = id.substring(1);
         switch (type) {
@@ -100,6 +135,16 @@ public final class IdUtil {
         return IdGenerator.of(Long.parseLong(id));
     }
 
+    /**
+     * 转义串联
+     * 串联字符串结构为：String.format(%s%s%s,value,splitor,value)
+     * 如果value中存在splitor将会被转化escape。
+     * escape：aa>a>bbb=》aa`>a>bbb
+     * @param splitor
+     * @param escape
+     * @param values
+     * @return
+     */
     public static String escape(char splitor, char escape, String... values) {
         StringBuilder escaped = new StringBuilder((values.length + 1) << 4);
         // Do escape for every item in values
@@ -112,7 +157,7 @@ public final class IdUtil {
                 escaped.append(value);
                 continue;
             }
-
+            //将values中包含的特殊字符splitor转义成escape+splitor
             // Do escape for current item
             for (int i = 0, n = value.length(); i < n; i++) {
                 char ch = value.charAt(i);
@@ -125,6 +170,17 @@ public final class IdUtil {
         return escaped.toString();
     }
 
+    /**
+     * 反转义
+     * escape：aa>a>bbb=》aa`>a>bbb
+     * unescape:
+     * 0:aa`>a => aa>a
+     * 1:bbb = > bbb
+     * @param id
+     * @param splitor
+     * @param escape
+     * @return
+     */
     public static String[] unescape(String id, String splitor, String escape) {
         /*
          * Note that the `splitor`/`escape` maybe special characters in regular

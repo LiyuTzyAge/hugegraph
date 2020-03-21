@@ -192,6 +192,24 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
+    /**
+     * liyu04 adaptive hbase-client 1.2.6
+     * @param table
+     * @param cfs
+     * @throws IOException
+     */
+//    public void createTable2(String table, List<byte[]> cfs) throws IOException
+//    {
+//        TableName tn = TableName.valueOf(table);
+//        HTableDescriptor htd = new HTableDescriptor(tn);
+//        for (byte[] cf : cfs) {
+//            htd.addFamily(new HColumnDescriptor(cf));
+//        }
+//        try(Admin admin = this.hbase.getAdmin()) {
+//            admin.createTable(htd);
+//        }
+//    }
+
     public void dropTable(String table) throws IOException {
         TableName tableName = TableName.valueOf(this.namespace, table);
         try (Admin admin = this.hbase.getAdmin()) {
@@ -237,6 +255,25 @@ public class HbaseSessions extends BackendSessionPool {
         TableName tableName = TableName.valueOf(this.namespace, table);
         try (Admin admin = this.hbase.getAdmin()) {
             return admin.truncateTableAsync(tableName, true);
+        }
+    }
+
+    /**
+     * liyu04 adaptive hbase-client 1.2.6
+     * sync truncate table
+     * @param table
+     * @throws IOException
+     */
+    public void truncateTableSync2(String table) throws IOException {
+        assert this.existsTable(table);
+        TableName tableName = TableName.valueOf(this.namespace, table);
+        try(Admin admin = this.hbase.getAdmin()) {
+            try {
+                admin.disableTable(tableName);
+            } catch (TableNotEnabledException ignored) {
+                // pass
+            }
+            admin.truncateTable(tableName, false);
         }
     }
 
