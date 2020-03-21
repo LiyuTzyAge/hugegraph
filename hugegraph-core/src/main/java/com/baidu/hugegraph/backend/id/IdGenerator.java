@@ -311,8 +311,9 @@ public abstract class IdGenerator {
         private static UUID fromBytes(byte[] bytes) {
             E.checkArgument(bytes != null, "The UUID can't be null");
             BytesBuffer buffer = BytesBuffer.wrap(bytes);
-            long high = buffer.readLong();
-            long low = buffer.readLong();
+            long high = buffer.readLong(); //8个字节
+            long low = buffer.readLong(); //8个字节
+            //16*byte,1byte*8bit=128bit
             return new UUID(high, low);
         }
 

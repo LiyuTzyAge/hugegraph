@@ -77,6 +77,9 @@ public class SchemaTransaction extends IndexableTransaction {
         return this.indexTx;
     }
 
+    /**
+     * 读之前检查是否有未提交数据
+     */
     @Override
     protected void beforeRead() {
         /*

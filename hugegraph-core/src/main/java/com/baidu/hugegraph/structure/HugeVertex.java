@@ -96,6 +96,10 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
         return this.label;
     }
 
+    /**
+     * 返回主键属性名称，如果主键由多个属性组合而成则返回拼接后的名称
+     * @return
+     */
     @Override
     public String name() {
         E.checkState(this.label.idStrategy() == IdStrategy.PRIMARY_KEY,
@@ -104,6 +108,7 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
                      this, this.label.idStrategy());
         if (this.name == null) {
             if (this.id != null) {
+                //通过id反解
                 String[] parts = SplicingIdGenerator.parse(this.id);
                 E.checkState(parts.length == 2,
                              "Invalid primary key vertex id '%s'", this.id);

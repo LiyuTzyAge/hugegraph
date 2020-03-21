@@ -24,12 +24,31 @@ import java.util.function.Function;
 
 import com.baidu.hugegraph.backend.id.Id;
 
+/**
+ * 缓存的标准接口
+ */
 public interface Cache {
 
+    /**
+     * get object by id
+     * @param id
+     * @return
+     */
     public Object get(Id id);
 
+    /**
+     * the object get or fetch from fetcher by id
+     * @param id
+     * @param fetcher
+     * @return
+     */
     public Object getOrFetch(Id id, Function<Id, Object> fetcher);
 
+    /**
+     * update cache by id and object
+     * @param id
+     * @param value
+     */
     public void update(Id id, Object value);
 
     public void updateIfAbsent(Id id, Object value);
@@ -38,18 +57,42 @@ public interface Cache {
 
     public void invalidate(Id id);
 
+    /**
+     * traverse all object of cache and accept the consumer
+     * @param consumer function
+     */
     public void traverse(Consumer<Object> consumer);
 
     public void clear();
 
+    /**
+     * the expire of the cache
+     * @param seconds
+     */
     public void expire(long seconds);
 
+    /**
+     * get expire
+     * @return
+     */
     public long expire();
 
+    /**
+     * ?
+     * @return
+     */
     public long tick();
 
+    /**
+     * get capacity of iterms
+     * @return
+     */
     public long capacity();
 
+    /**
+     * get the size of object
+     * @return
+     */
     public long size();
 
     public long hits();

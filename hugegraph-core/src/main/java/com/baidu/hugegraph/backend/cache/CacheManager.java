@@ -55,6 +55,11 @@ public class CacheManager {
         this.scheduleTimer(TIMER_TICK_PERIOD);
     }
 
+    /**
+     * 启动定时清理线程
+     * @param period
+     * @return
+     */
     private TimerTask scheduleTimer(float period) {
         TimerTask task = new TimerTask() {
             @Override

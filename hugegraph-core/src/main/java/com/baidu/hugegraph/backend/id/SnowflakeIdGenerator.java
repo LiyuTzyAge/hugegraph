@@ -36,16 +36,24 @@ public class SnowflakeIdGenerator extends IdGenerator {
 
     private static final Logger LOG = Log.logger(Id.class);
 
+    //<graphName,SnowflakeIdGenerator>
     private static final Map<String, SnowflakeIdGenerator> INSTANCES =
                          new ConcurrentHashMap<>();
-
+    //id是否通返回字符串
     private final boolean forceString;
+    //生成全局唯一ID，long类型，nextId是同步方法
     private final IdWorker idWorker;
 
+    /**
+     * 每个图对应一个SnowflakeIdGenerator，防止id重复
+     * @param graph
+     * @return
+     */
     public static SnowflakeIdGenerator instance(HugeGraph graph) {
         String graphname = graph.name();
         SnowflakeIdGenerator generator = INSTANCES.get(graphname);
         if (generator == null) {
+            //为何使用synchronized？？,不用INSTANCES.putIfAbsent()
             synchronized (INSTANCES) {
                 if (!INSTANCES.containsKey(graphname)) {
                     HugeConfig conf = graph.configuration();
@@ -58,6 +66,10 @@ public class SnowflakeIdGenerator extends IdGenerator {
         return generator;
     }
 
+    /**
+     * 为了保证id唯一性，可以指定SNOWFLAKE_WORKER_ID、SNOWFLAKE_DATACENTER_ID
+     * @param config
+     */
     private SnowflakeIdGenerator(HugeConfig config) {
         long workerId = config.get(CoreOptions.SNOWFLAKE_WORKER_ID);
         long datacenterId = config.get(CoreOptions.SNOWFLAKE_DATACENTER_ID);
@@ -65,10 +77,15 @@ public class SnowflakeIdGenerator extends IdGenerator {
         this.idWorker = new IdWorker(workerId, datacenterId);
     }
 
+    /**
+     * 生成全局唯一id，long数值，会不会越界
+     * @return
+     */
     public Id generate() {
         if (this.idWorker == null) {
             throw new HugeException("Please initialize before using");
         }
+        //LongId
         Id id = of(this.idWorker.nextId());
         if (!this.forceString) {
             return id;

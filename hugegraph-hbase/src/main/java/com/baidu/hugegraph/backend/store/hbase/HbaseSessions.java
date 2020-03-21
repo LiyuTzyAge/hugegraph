@@ -32,17 +32,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellScanner;
-import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.NamespaceDescriptor;
-import org.apache.hadoop.hbase.RegionMetrics;
-import org.apache.hadoop.hbase.ServerName;
-import org.apache.hadoop.hbase.Size;
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.TableNotEnabledException;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
@@ -184,6 +174,24 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
+    /**
+     * liyu04 adaptive hbase-client 1.2.6
+     * @param table
+     * @param cfs
+     * @throws IOException
+     */
+    public void createTable2(String table, List<byte[]> cfs) throws IOException
+    {
+        TableName tn = TableName.valueOf(table);
+        HTableDescriptor htd = new HTableDescriptor(tn);
+        for (byte[] cf : cfs) {
+            htd.addFamily(new HColumnDescriptor(cf));
+        }
+        try(Admin admin = this.hbase.getAdmin()) {
+            admin.createTable(htd);
+        }
+    }
+
     public void dropTable(String table) throws IOException {
         TableName tableName = TableName.valueOf(this.namespace, table);
         try(Admin admin = this.hbase.getAdmin()) {
@@ -206,6 +214,25 @@ public class HbaseSessions extends BackendSessionPool {
                 // pass
             }
             return admin.truncateTableAsync(tableName, false);
+        }
+    }
+
+    /**
+     * liyu04 adaptive hbase-client 1.2.6
+     * sync truncate table
+     * @param table
+     * @throws IOException
+     */
+    public void truncateTableSync2(String table) throws IOException {
+        assert this.existsTable(table);
+        TableName tableName = TableName.valueOf(this.namespace, table);
+        try(Admin admin = this.hbase.getAdmin()) {
+            try {
+                admin.disableTable(tableName);
+            } catch (TableNotEnabledException ignored) {
+                // pass
+            }
+            admin.truncateTable(tableName, false);
         }
     }
 

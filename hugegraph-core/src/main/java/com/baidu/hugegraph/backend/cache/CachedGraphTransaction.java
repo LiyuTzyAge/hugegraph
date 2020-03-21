@@ -48,8 +48,9 @@ import com.google.common.collect.ImmutableSet;
 public final class CachedGraphTransaction extends GraphTransaction {
 
     private final static int MAX_CACHE_EDGES_PER_QUERY = 100;
-
+    //根据顶点id缓存
     private final Cache verticesCache;
+    //根据查询（查询对象）缓存数据
     private final Cache edgesCache;
 
     private EventListener storeEventListener;
@@ -142,54 +143,84 @@ public final class CachedGraphTransaction extends GraphTransaction {
         graphEventHub.unlisten(Events.CACHE, this.cacheEventListener);
     }
 
+    /**
+     * 查询vertex数据,先缓存在底层
+     * 针对定点查询有优化 (IdQuery) query
+     * 正常查询 queryVerticesFromBackend
+     * @param query 查询封装
+     * @return
+     */
     @Override
     protected Iterator<HugeVertex> queryVerticesFromBackend(Query query) {
         if (!query.ids().isEmpty() && query.conditions().isEmpty()) {
+            //只通过id进行查询
             return this.queryVerticesByIds((IdQuery) query);
         } else {
             return super.queryVerticesFromBackend(query);
         }
     }
 
+    /**
+     * 根据vertex id查询，先查询缓存，再查询底层
+     * @param query
+     * @return
+     */
     private Iterator<HugeVertex> queryVerticesByIds(IdQuery query) {
+        //用于保存缓存中不存在的ids
         IdQuery newQuery = new IdQuery(HugeType.VERTEX, query);
         List<HugeVertex> vertices = new ArrayList<>(query.ids().size());
         for (Id vertexId : query.ids()) {
+            //通过id可以利用缓存
             Object vertex = this.verticesCache.get(vertexId);
             if (vertex != null) {
                 vertices.add((HugeVertex) vertex);
             } else {
+                //缓存中没有找到结果，保存为找到结果的vertexId
                 newQuery.query(vertexId);
             }
         }
         if (vertices.isEmpty()) {
             // Just use the origin query if find none from the cache
+            //缓存中一条没有，则完全由底层查询
             newQuery = query;
         }
         if (!newQuery.empty()) {
+            //对缓存中不存在的重新查询底层
             Iterator<HugeVertex> rs = super.queryVerticesFromBackend(newQuery);
             while (rs.hasNext()) {
                 HugeVertex vertex = rs.next();
                 vertices.add(vertex);
+                //更新这部分缓存
                 this.verticesCache.update(vertex.id(), vertex);
             }
         }
         return vertices.iterator();
     }
 
+    /**
+     * 根据query查询对象，查询边
+     * 先获取缓存（将查询封装成ID进行缓存与查询），如果不存在则查询底层，
+     * 如果数据量小于MAX_CACHE_EDGES_PER_QUERY，则进行缓存
+     * @param query
+     * @return
+     */
     @Override
     protected Iterator<HugeEdge> queryEdgesFromBackend(Query query) {
         if (query.empty() || query.paging()) {
             // Query all edges or query edges in paging, don't cache it
+            //大数据量
             return super.queryEdgesFromBackend(query);
         }
-
+        //将查询对象封装成ID
         Id id = new QueryId(query);
+        //edge也是通过id进行查询,这个id是????
+        //一个id对应多个edge
         @SuppressWarnings("unchecked")
         List<HugeEdge> edges = (List<HugeEdge>) this.edgesCache.get(id);
         if (edges == null) {
             // Iterator can't be cached, caching list instead
             edges = ImmutableList.copyOf(super.queryEdgesFromBackend(query));
+            //每个查询缓存限制
             if (edges.size() <= MAX_CACHE_EDGES_PER_QUERY) {
                 this.edgesCache.update(id, edges);
             }
@@ -197,18 +228,26 @@ public final class CachedGraphTransaction extends GraphTransaction {
         return edges.iterator();
     }
 
-
+    /**
+     * 同步缓存
+     * 将顶点的新增，修改，删除同步到缓存
+     * 当前策略，如果edge发生修改则清空edgesCache
+     * @param mutations
+     */
     @Override
     protected void commitMutation2Backend(BackendMutation... mutations) {
         // Collect changes before commit
+        //等待提交的顶点数据（新增，修改，删除）
         Collection<HugeVertex> changes = this.verticesInTxUpdated();
         Collection<HugeVertex> deletions = this.verticesInTxRemoved();
+        //等待提交的边数据（新增，修改，删除）
         int edgesInTxSize = this.edgesInTxSize();
 
         try {
             super.commitMutation2Backend(mutations);
             // Update vertex cache
             for (HugeVertex vertex : changes) {
+                //提交结束后关闭事务
                 vertex = vertex.resetTx();
                 this.verticesCache.updateIfPresent(vertex.id(), vertex);
             }
@@ -226,12 +265,19 @@ public final class CachedGraphTransaction extends GraphTransaction {
         }
     }
 
+    /**
+     * 删除索引操作，更新edge缓存
+     * @param indexLabel
+     */
     @Override
     public void removeIndex(IndexLabel indexLabel) {
         try {
             super.removeIndex(indexLabel);
         } finally {
+            //因为vertex是根据id缓存的，所以不受影响
             // Update edge cache if needed (any edge-index is deleted)
+            //如果edge-index被删除，则需要更新edge cache，删除对应的query。
+            //因为edge cache是根据query缓存的，edge-index被删除则对应的query就不存在了
             if (indexLabel.baseType() == HugeType.EDGE_LABEL) {
                 // TODO: Use a more precise strategy to update the edge cache
                 this.edgesCache.clear();

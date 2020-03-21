@@ -18,3 +18,5 @@
 target
 gen-java
 build
+hugegraph-0.10.4/
+dist.sh
