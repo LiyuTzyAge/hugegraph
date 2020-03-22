@@ -48,8 +48,8 @@ public class Query implements Cloneable {
 
     protected static final Query NONE = new Query(HugeType.UNKNOWN);
 
-    private HugeType resultType;
-    private Map<HugeKeys, Order> orders;
+    private HugeType resultType;    //元数据类型
+    private Map<HugeKeys, Order> orders;    //HugeKeys 元数据字段类型
     //以下为分页逻辑参数
     private long offset;    //起点
     private long actualOffset;  ////起点
@@ -365,6 +365,11 @@ public class Query implements Cloneable {
         return this.ids().isEmpty() && this.conditions().isEmpty();
     }
 
+    /**
+     * 查询条件过滤，符合条件返回true
+     * @param element
+     * @return
+     */
     public boolean test(HugeElement element) {
         return true;
     }

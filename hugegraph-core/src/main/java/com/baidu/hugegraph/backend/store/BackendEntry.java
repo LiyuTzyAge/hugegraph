@@ -30,6 +30,10 @@ import com.baidu.hugegraph.type.Idfiable;
 import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.StringEncoding;
 
+/**
+ * BackendEntry对应一个Vertex
+ * BackendColumn对应一个Vertex的Property
+ */
 public interface BackendEntry extends Idfiable {
 
     public static class BackendColumn implements Comparable<BackendColumn> {
@@ -51,6 +55,11 @@ public interface BackendEntry extends Idfiable {
                                  StringEncoding.decode(value));
         }
 
+        /**
+         * 根据名称比较
+         * @param other
+         * @return
+         */
         @Override
         public int compareTo(BackendColumn other) {
             if (other == null) {
@@ -87,6 +96,12 @@ public interface BackendEntry extends Idfiable {
 
     public void clear();
 
+    /**
+     * 确认column是否属于当前Entry
+     * column的name由（id与名称）拼接而成，如property的id
+     * @param column
+     * @return
+     */
     public default boolean belongToMe(BackendColumn column) {
         return Bytes.prefixWith(column.name, id().asBytes());
     }

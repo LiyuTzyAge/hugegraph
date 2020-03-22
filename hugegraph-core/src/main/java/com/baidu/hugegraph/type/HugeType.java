@@ -24,6 +24,9 @@ import java.util.Map;
 
 import com.baidu.hugegraph.type.define.SerialEnum;
 
+/**
+ * huge元数据类型
+ */
 public enum HugeType implements SerialEnum {
 
     UNKNOWN(0, "UNKNOWN"),

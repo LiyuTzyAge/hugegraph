@@ -93,6 +93,11 @@ public class IdQuery extends Query {
         return this;
     }
 
+    /**
+     * 查询Ids
+     * @param element
+     * @return
+     */
     @Override
     public boolean test(HugeElement element) {
         return this.ids.contains(element.id());

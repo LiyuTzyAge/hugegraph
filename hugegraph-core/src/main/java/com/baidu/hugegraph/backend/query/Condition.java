@@ -463,9 +463,9 @@ public abstract class Condition {
         protected Object value;
 
         // The key serialized(code/string) by backend store.
-        protected Object serialKey;
+        protected Object serialKey;     //查询条件参数字段序列化
         // The value serialized(code/string) by backend store.
-        protected Object serialValue;
+        protected Object serialValue;   //查询条件参数序列化
 
         protected Set<RelationType> UNFLATTEN_RELATION_TYPES = ImmutableSet.of(
                                     RelationType.IN, RelationType.NOT_IN,

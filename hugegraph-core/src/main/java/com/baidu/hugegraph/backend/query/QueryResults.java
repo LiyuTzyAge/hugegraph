@@ -47,7 +47,7 @@ public class QueryResults {
 
     private static final QueryResults EMPTY = new QueryResults(emptyIterator(),
                                                                Query.NONE);
-
+    //多个ID结果，每个ID包含自身的BackendColumn<key,value> 即property<key,value>
     private final Iterator<BackendEntry> results;
     private final List<Query> queries;
 
@@ -97,6 +97,13 @@ public class QueryResults {
         return Collections.unmodifiableList(this.queries);
     }
 
+    /**
+     * 返回结果的Iterator
+     * 对分页情况，根据输入排序等进行顺序返回
+     * @param origin
+     * @param <T>
+     * @return
+     */
     public <T extends Idfiable> Iterator<T> keepInputOrderIfNeeded(
                                             Iterator<T> origin) {
         if (!origin.hasNext()) {
@@ -132,6 +139,10 @@ public class QueryResults {
         return true;
     }
 
+    /**
+     * 是否分页
+     * @return
+     */
     private boolean paging() {
         for (Query query : this.queries) {
             Query origin = query.originQuery();
@@ -152,6 +163,10 @@ public class QueryResults {
         return false;
     }
 
+    /**
+     * 返回所有query中相关的ids
+     * @return
+     */
     private Set<Id> queryIds() {
         if (this.queries.size() == 1) {
             return this.queries.get(0).ids();
@@ -164,6 +179,12 @@ public class QueryResults {
         return ids;
     }
 
+    /**
+     * 返回一个包含list的迭代器
+     * @param iterator
+     * @param <T>
+     * @return
+     */
     public static <T> ListIterator<T> toList(Iterator<T> iterator) {
         return new ListIterator<>(Query.DEFAULT_CAPACITY, iterator);
     }
@@ -180,6 +201,14 @@ public class QueryResults {
         }
     }
 
+    /**
+     * 将结果fill到map中
+     * key=id
+     * value=T
+     * @param iterator
+     * @param map
+     * @param <T>
+     */
     public static <T extends Idfiable> void fillMap(Iterator<T> iterator,
                                                     Map<Id, T> map) {
         try {
@@ -194,9 +223,17 @@ public class QueryResults {
         }
     }
 
+    /**
+     * 返回FlatMapperIterator处理过的QueryResults
+     * @param iterator
+     * @param func
+     * @param <T>
+     * @return
+     */
     public static <T> QueryResults flatMap(Iterator<T> iterator,
                                            Function<T, QueryResults> func) {
         QueryResults[] qr = new QueryResults[1];
+        //FlatMapperIterator对每一个元素所用func
         qr[0] = new QueryResults(new FlatMapperIterator<>(iterator, i -> {
             QueryResults results = func.apply(i);
             if (results == null) {

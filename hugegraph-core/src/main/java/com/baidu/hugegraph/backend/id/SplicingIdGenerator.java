@@ -94,7 +94,8 @@ public class SplicingIdGenerator extends IdGenerator {
 
     /**
      * Concat property values with NAME_SPLITOR
-     * 使用场景：生成主键名称，主键由多个属性组成时，需要拼接成一个，以NAME_SPLITOR分隔
+     * 使用场景：1.生成主键名称，主键由多个属性组成时，需要拼接成一个，以NAME_SPLITOR分隔
+     * 2.ConditionQuery.concatValues 组合多个查询条件参数值（属性参数值）,用于二级索引组合查询
      * @param values the property values to be concatted
      * @return       concatted string value
      */

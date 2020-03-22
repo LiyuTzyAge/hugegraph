@@ -19,6 +19,9 @@
 
 package com.baidu.hugegraph.type.define;
 
+/**
+ * huge元数据字段名称
+ */
 public enum HugeKeys {
 
     UNKNOWN(0, "undefined"),

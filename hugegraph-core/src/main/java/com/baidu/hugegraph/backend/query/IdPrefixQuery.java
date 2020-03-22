@@ -25,11 +25,14 @@ import com.baidu.hugegraph.type.HugeType;
 import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.E;
 
+/**
+ * 由某个ID开始，并且匹配前缀
+ */
 public final class IdPrefixQuery extends Query {
 
-    private final Id start;
+    private final Id start; //开始点
     private final boolean inclusiveStart;
-    private final Id prefix;
+    private final Id prefix; //前缀
 
     public IdPrefixQuery(HugeType resultType, Id prefix) {
         this(resultType, null, prefix, true, prefix);
@@ -81,7 +84,9 @@ public final class IdPrefixQuery extends Query {
     public boolean test(HugeElement element) {
         byte[] elem = element.id().asBytes();
         int cmp = Bytes.compare(elem, this.start.asBytes());
+        //需要大于起始点
         boolean matchedStart = this.inclusiveStart ? cmp >= 0 : cmp > 0;
+        //比较前缀每个字节，满足前缀
         boolean matchedPrefix = Bytes.prefixWith(elem, this.prefix.asBytes());
         return matchedStart && matchedPrefix;
     }

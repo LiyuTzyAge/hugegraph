@@ -45,6 +45,7 @@ import com.google.common.base.Function;
 
 public final class ConditionQuery extends IdQuery {
 
+    //每一项为Relation类型，为进行拼接
     // Conditions will be concated with `and` by default
     private Set<Condition> conditions = new LinkedHashSet<>();
 
@@ -59,10 +60,16 @@ public final class ConditionQuery extends IdQuery {
         super(resultType, originQuery);
     }
 
+    /**
+     * 注册查询条件
+     * @param condition
+     * @return
+     */
     public ConditionQuery query(Condition condition) {
         // Query by id (HugeGraph-259)
         if (condition instanceof Relation) {
             Relation relation = (Relation) condition;
+            //id等值查询
             if (relation.key().equals(HugeKeys.ID) &&
                 relation.relation() == RelationType.EQ) {
                 E.checkArgument(relation.value() instanceof Id,
@@ -71,7 +78,7 @@ public final class ConditionQuery extends IdQuery {
                 return this;
             }
         }
-
+        //注册查询条件
         this.conditions.add(condition);
         return this;
     }
@@ -141,6 +148,13 @@ public final class ConditionQuery extends IdQuery {
         return relations;
     }
 
+    /**
+     * 返回key对应的输入条件值，
+     * 计算类型必须是EQ
+     * @param key
+     * @param <T>
+     * @return
+     */
     public <T> T condition(Object key) {
         List<Object> values = new ArrayList<>();
         for (Condition c : this.conditions) {
@@ -161,6 +175,10 @@ public final class ConditionQuery extends IdQuery {
         return value;
     }
 
+    /**
+     * 删除key对应的condition
+     * @param key
+     */
     public void unsetCondition(Object key) {
         for (Iterator<Condition> iter = this.conditions.iterator();
              iter.hasNext();) {
@@ -172,6 +190,11 @@ public final class ConditionQuery extends IdQuery {
         }
     }
 
+    /**
+     * 某种条件是否存在
+     * @param key
+     * @return
+     */
     public boolean containsCondition(HugeKeys key) {
         return this.condition(key) != null;
     }
@@ -217,6 +240,10 @@ public final class ConditionQuery extends IdQuery {
         return true;
     }
 
+    /**
+     * 返回系统元数据条件列表
+     * @return
+     */
     public List<Condition> syspropConditions() {
         this.checkFlattened();
         List<Condition> conds = new ArrayList<>();
@@ -240,6 +267,10 @@ public final class ConditionQuery extends IdQuery {
         return conditions;
     }
 
+    /**
+     * 返回用户条件列表
+     * @return
+     */
     public List<Condition> userpropConditions() {
         this.checkFlattened();
         List<Condition> conds = new ArrayList<>();
@@ -251,6 +282,11 @@ public final class ConditionQuery extends IdQuery {
         return conds;
     }
 
+    /**
+     * 返回property计算条件列表
+     * @param key if of property
+     * @return
+     */
     public List<Condition> userpropConditions(Id key) {
         this.checkFlattened();
         List<Condition> conditions = new ArrayList<>();
@@ -291,6 +327,7 @@ public final class ConditionQuery extends IdQuery {
     /**
      * This method is only used for secondary index scenario,
      * its relation must be EQ
+     * fields对应的serialValue进行字符串拼接
      * @param fields the user property fields
      * @return the corresponding user property serial values of fields
      */
@@ -384,14 +421,15 @@ public final class ConditionQuery extends IdQuery {
 
     @Override
     public boolean test(HugeElement element) {
+        //根据id 查询
         if (!this.ids().isEmpty() && !super.test(element)) {
             return false;
         }
-
+        //在已生成的结果中查找
         if (this.resultsFilter != null) {
             return this.resultsFilter.apply(element);
         }
-
+        //轮询所有条件
         for (Condition cond : this.conditions()) {
             if (!cond.test(element)) {
                 return false;
@@ -414,6 +452,11 @@ public final class ConditionQuery extends IdQuery {
         return true;
     }
 
+    /**
+     * 是否存在重复Key的情况
+     * @param keys
+     * @return
+     */
     public boolean mayHasDupKeys(Set<HugeKeys> keys) {
         Map<HugeKeys, Integer> keyCounts = new HashMap<>();
         for (Condition condition : this.conditions()) {
@@ -437,6 +480,7 @@ public final class ConditionQuery extends IdQuery {
         this.optimizedType = optimizedType;
 
         Query originQuery = this.originQuery();
+        //向上传递
         if (originQuery instanceof ConditionQuery) {
             ((ConditionQuery) originQuery).optimized(optimizedType);
         }
@@ -446,6 +490,10 @@ public final class ConditionQuery extends IdQuery {
         return this.optimizedType;
     }
 
+    /**
+     * 注册结果过滤器 ？？？
+     * @param filter
+     */
     public void registerResultsFilter(Function<HugeElement, Boolean> filter) {
         this.resultsFilter = filter;
 
@@ -455,6 +503,11 @@ public final class ConditionQuery extends IdQuery {
         }
     }
 
+    /**
+     * 将多个查询条件参数值，进行字符串拼接
+     * @param values
+     * @return
+     */
     public static String concatValues(List<Object> values) {
         List<Object> newValues = new ArrayList<>(values.size());
         for (Object v : values) {
@@ -463,6 +516,11 @@ public final class ConditionQuery extends IdQuery {
         return SplicingIdGenerator.concatValues(newValues);
     }
 
+    /**
+     * 将数值转换为string
+     * @param value
+     * @return
+     */
     private static Object convertNumberIfNeeded(Object value) {
         if (NumericUtil.isNumber(value) || value instanceof Date) {
             // Numeric or date values should be converted to string

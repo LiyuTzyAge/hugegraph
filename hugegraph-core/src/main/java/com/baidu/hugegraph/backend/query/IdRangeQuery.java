@@ -57,6 +57,8 @@ public final class IdRangeQuery extends Query {
         this.end = end;
         this.inclusiveStart = inclusiveStart;
         this.inclusiveEnd = inclusiveEnd;
+        //???由存了一份状态信息，索引IdRange与originQuery
+        // 被认为是两个独立的Query
         if (originQuery != null) {
             this.copyBasic(originQuery);
         }
@@ -83,6 +85,11 @@ public final class IdRangeQuery extends Query {
         return false;
     }
 
+    /**
+     * 是否在range范围内
+     * @param element
+     * @return
+     */
     @Override
     public boolean test(HugeElement element) {
         int cmp1 = Bytes.compare(element.id().asBytes(), this.start.asBytes());
