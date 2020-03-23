@@ -45,7 +45,7 @@ import com.google.common.base.Function;
 
 public final class ConditionQuery extends IdQuery {
 
-    //每一项为Relation类型，为进行拼接
+    //每一项为Relation类型，可进行拼接
     // Conditions will be concated with `and` by default
     private Set<Condition> conditions = new LinkedHashSet<>();
 
@@ -222,6 +222,10 @@ public final class ConditionQuery extends IdQuery {
         return this.containsCondition(Condition.RelationType.SCAN);
     }
 
+    /**
+     * 是否全是sysprop condition
+     * @return
+     */
     public boolean allSysprop() {
         for (Condition c : this.conditions) {
             if (!c.isSysprop()) {
@@ -313,6 +317,10 @@ public final class ConditionQuery extends IdQuery {
         this.conditions.removeIf(condition -> !condition.isSysprop());
     }
 
+    /**
+     * 返回所有userprop条件key，即所有property的id
+     * @return
+     */
     public Set<Id> userpropKeys() {
         Set<Id> keys = new LinkedHashSet<>();
         for (Relation r : this.relations()) {
@@ -328,7 +336,8 @@ public final class ConditionQuery extends IdQuery {
      * This method is only used for secondary index scenario,
      * its relation must be EQ
      * fields对应的serialValue进行字符串拼接
-     * @param fields the user property fields
+     * 返回，查询二级索引的，多个参数值拼接结果；组合索引
+     * @param fields the user property fields 属性id
      * @return the corresponding user property serial values of fields
      */
     public String userpropValuesString(List<Id> fields) {
@@ -355,6 +364,11 @@ public final class ConditionQuery extends IdQuery {
         return concatValues(values);
     }
 
+    /**
+     * 返回单个属性id的serialValue，即条件输入参数
+     * @param field 属性id
+     * @return
+     */
     public Set<Object> userpropValues(Id field) {
         Set<Object> values = new HashSet<>();
         for (Relation r : this.userpropRelations()) {
@@ -406,6 +420,11 @@ public final class ConditionQuery extends IdQuery {
         return false;
     }
 
+    /**
+     * 是否包含所有keys
+     * @param keys
+     * @return
+     */
     public boolean matchUserpropKeys(List<Id> keys) {
         Set<Id> conditionKeys = this.userpropKeys();
         return keys.size() > 0 && conditionKeys.containsAll(keys);
@@ -454,7 +473,7 @@ public final class ConditionQuery extends IdQuery {
 
     /**
      * 是否存在重复Key的情况
-     * @param keys
+     * @param keys 系统属性key
      * @return
      */
     public boolean mayHasDupKeys(Set<HugeKeys> keys) {
@@ -491,7 +510,7 @@ public final class ConditionQuery extends IdQuery {
     }
 
     /**
-     * 注册结果过滤器 ？？？
+     * 注册结果 ？？？
      * @param filter
      */
     public void registerResultsFilter(Function<HugeElement, Boolean> filter) {

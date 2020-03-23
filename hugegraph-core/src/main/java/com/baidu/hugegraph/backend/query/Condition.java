@@ -74,6 +74,7 @@ public abstract class Condition {
         TEXT_CONTAINS("textcontains", (v1, v2) -> {
             return v1 != null && ((String) v1).contains((String) v2);
         }),
+        //字符串contain 列表中任意一个字符串
         TEXT_CONTAINS_ANY("textcontainsany", (v1, v2) -> {
             assert v2 != null;
             if (v1 == null) {
