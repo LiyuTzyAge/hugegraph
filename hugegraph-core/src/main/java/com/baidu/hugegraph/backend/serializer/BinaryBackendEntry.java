@@ -163,6 +163,9 @@ public class BinaryBackendEntry implements BackendEntry {
         return true;
     }
 
+    /**
+     * 所有ID的二进制表现形式(ByteBuffer)
+     */
     protected static final class BinaryId implements Id {
 
         private final byte[] bytes;
@@ -182,8 +185,13 @@ public class BinaryBackendEntry implements BackendEntry {
             return IdType.UNKNOWN;
         }
 
+        /**
+         * ByteBuffer
+         * @return
+         */
         @Override
         public Object asObject() {
+            // Wraps a byte array into a buffer.
             return ByteBuffer.wrap(this.bytes);
         }
 
@@ -207,6 +215,11 @@ public class BinaryBackendEntry implements BackendEntry {
             return this.bytes;
         }
 
+        /**
+         * 由offset->length copy bytes
+         * @param offset 起始位置
+         * @return
+         */
         public byte[] asBytes(int offset) {
             E.checkArgument(offset < this.bytes.length,
                             "Invalid offset %s, must be < length %s",
@@ -232,6 +245,10 @@ public class BinaryBackendEntry implements BackendEntry {
             return Arrays.equals(this.bytes, ((BinaryId) other).bytes);
         }
 
+        /**
+         * bytes[] to Hex
+         * @return
+         */
         @Override
         public String toString() {
             return "0x" + Bytes.toHex(this.bytes);

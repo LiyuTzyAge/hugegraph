@@ -39,6 +39,9 @@ import com.baidu.hugegraph.util.Log;
 import com.baidu.hugegraph.util.VersionUtil;
 import com.baidu.hugegraph.version.CoreVersion;
 
+/**
+ * 插件注册管理工具
+ */
 public class RegisterUtil {
 
     private static final Logger LOG = Log.logger(RegisterUtil.class);

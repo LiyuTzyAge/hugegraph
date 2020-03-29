@@ -24,6 +24,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.baidu.hugegraph.backend.BackendException;
 
+/**
+ * 如Java-SIP方式的插件注册管理器
+ */
 public class SerializerFactory {
 
     private static Map<String, Class<? extends AbstractSerializer>> serializers;
@@ -55,6 +58,13 @@ public class SerializerFactory {
         }
     }
 
+    /**
+     * 注册自定义序列化插件，使底层存储端可以像插件一样被扩展
+     * 如：SerializerFactory.register("postgresql","com.baidu.hugegraph.backend
+     * .store.postgresql.PostgresqlSerializer");
+     * @param name 名称
+     * @param classPath 底层序列化插件
+     */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public static void register(String name, String classPath) {
         ClassLoader classLoader = SerializerFactory.class.getClassLoader();

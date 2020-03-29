@@ -41,10 +41,11 @@ import com.baidu.hugegraph.util.StringEncoding;
 
 /**
  * class BytesBuffer is a util for read/write binary
+ * 对象序列化工具（Vertex、Edge、ID）等
  */
 public final class BytesBuffer {
 
-    public static final int BYTE_LEN = Byte.BYTES;
+    public static final int BYTE_LEN = Byte.BYTES;  //字节长度
     public static final int SHORT_LEN = Short.BYTES;
     public static final int INT_LEN = Integer.BYTES;
     public static final int LONG_LEN = Long.BYTES;
@@ -60,19 +61,23 @@ public final class BytesBuffer {
     public static final int ID_LEN_MASK = 0x7f;
     public static final int ID_LEN_MAX = 0x7f + 1; // 128
     public static final int BIG_ID_LEN_MAX = 0x7fff + 1; // 32768
+    // 字节最大值，代表字符串结尾
+    public static final byte STRING_ENDING_BYTE = (byte) 0xff;  //byte
 
-    public static final byte STRING_ENDING_BYTE = (byte) 0xff;
     public static final int STRING_LEN_MAX = UINT16_MAX;
 
     // The value must be in range [8, ID_LEN_MAX]
     public static final int INDEX_HASH_ID_THRESHOLD = 32;
 
-    public static final int DEFAULT_CAPACITY = 64;
+    public static final int DEFAULT_CAPACITY = 64;      //默认容量
     public static final int MAX_BUFFER_CAPACITY = 128 * 1024 * 1024; // 128M
 
-    public static final int BUF_EDGE_ID = 128;
+    public static final int BUF_EDGE_ID = 128;      //edge id 长度
     public static final int BUF_PROPERTY = 64;
 
+    /**
+     * ByteBuffer nio 缓存
+     */
     private ByteBuffer buffer;
 
     public BytesBuffer() {
@@ -137,6 +142,10 @@ public final class BytesBuffer {
         return this.buffer.remaining();
     }
 
+    /**
+     * 向缓存申请空间
+     * @param size
+     */
     private void require(int size) {
         // Does need to resize?
         if (this.buffer.limit() - this.buffer.position() >= size) {
@@ -148,8 +157,11 @@ public final class BytesBuffer {
         E.checkArgument(newcapacity <= MAX_BUFFER_CAPACITY,
                         "Capacity exceeds max buffer capacity: %s",
                         MAX_BUFFER_CAPACITY);
+        //重建缓存
         ByteBuffer newBuffer = ByteBuffer.allocate(newcapacity);
+        //翻转缓存，准备写入
         this.buffer.flip();
+        //此方法将给定源缓冲区中剩余的字节传输到此缓冲区
         newBuffer.put(this.buffer);
         this.buffer = newBuffer;
     }
@@ -167,8 +179,15 @@ public final class BytesBuffer {
         return this;
     }
 
+    /**
+     * 向缓存写入数据
+     * @param val
+     * @return
+     */
     public BytesBuffer write(byte[] val) {
+        //申请空间
         require(BYTE_LEN * val.length);
+        //写入字节数据
         this.buffer.put(val);
         return this;
     }
@@ -297,6 +316,11 @@ public final class BytesBuffer {
         return StringEncoding.decode(this.readBytes());
     }
 
+    /**
+     * 写入字符串结尾
+     * @param val 字符串结尾
+     * @return
+     */
     public BytesBuffer writeStringWithEnding(String val) {
         if (!val.isEmpty()) {
             byte[] bytes = StringEncoding.encode(val);
@@ -504,10 +528,22 @@ public final class BytesBuffer {
         return values;
     }
 
+    /**
+     * 根据id类型写入id（Long,String,UUID,EDGE）
+     * @param id
+     * @return
+     */
     public BytesBuffer writeId(Id id) {
         return this.writeId(id, false);
     }
 
+    /**
+     * 根据id类型写入id（Long,String,UUID,EDGE）
+     * 未细看
+     * @param id
+     * @param big id是否为长id（短：<=128，长：<=32768）
+     * @return
+     */
     public BytesBuffer writeId(Id id, boolean big) {
         switch (id.type()) {
             case LONG:
@@ -532,6 +568,7 @@ public final class BytesBuffer {
                 bytes = id.asBytes();
                 int len = bytes.length;
                 E.checkArgument(len > 0, "Can't write empty id");
+                //id是否为长id
                 if (!big) {
                     E.checkArgument(len <= ID_LEN_MAX,
                                     "Id max length is %s, but got %s {%s}",
@@ -586,6 +623,12 @@ public final class BytesBuffer {
         }
     }
 
+    /**
+     * Edge id 序列化，
+     * 格式 owner-vertex + directory + edge-label + sort-values + other-vertex
+     * @param id
+     * @return
+     */
     public BytesBuffer writeEdgeId(Id id) {
         EdgeId edge = (EdgeId) id;
         this.writeId(edge.ownerVertexId());
@@ -602,10 +645,23 @@ public final class BytesBuffer {
                           this.readId());
     }
 
+    /**
+     * 索引id转BytesBuffer
+     * @param id
+     * @param type
+     * @return
+     */
     public BytesBuffer writeIndexId(Id id, HugeType type) {
         return this.writeIndexId(id, type, true);
     }
 
+    /**
+     * 索引id转BytesBuffer
+     * @param id
+     * @param type
+     * @param withEnding 是否写入字符串结尾
+     * @return
+     */
     public BytesBuffer writeIndexId(Id id, HugeType type, boolean withEnding) {
         byte[] bytes = id.asBytes();
         int len = bytes.length;

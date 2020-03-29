@@ -73,12 +73,14 @@ public class BinarySerializer extends AbstractSerializer {
 
     public static final byte[] EMPTY_BYTES = new byte[0];
 
+    //?????? 是指id存储在rowKey中，天然索引中
     /*
      * Id is stored in column name if keyWithIdPrefix=true like RocksDB,
      * else stored in rowkey like HBase.
      */
-    private final boolean keyWithIdPrefix;
-    private final boolean indexWithIdPrefix;
+    //Id前缀用于数据分布
+    private final boolean keyWithIdPrefix;      //带Id前缀的键
+    private final boolean indexWithIdPrefix;     //带Id前缀的索引
 
     public BinarySerializer() {
         this(true, true);
@@ -90,8 +92,16 @@ public class BinarySerializer extends AbstractSerializer {
         this.indexWithIdPrefix = indexWithIdPrefix;
     }
 
+    /**
+     * id to BytesBuffer，to BinaryBackendEntry
+     * 将id序列化为底层查询对象BinaryBackendEntry
+     * @param type
+     * @param id
+     * @return
+     */
     @Override
     public BinaryBackendEntry newBackendEntry(HugeType type, Id id) {
+        //创建BytesBuffer，写入id
         BytesBuffer buffer = BytesBuffer.allocate(1 + id.length());
         byte[] idBytes = type.isIndex() ?
                          buffer.writeIndexId(id, type).bytes() :
@@ -99,16 +109,32 @@ public class BinarySerializer extends AbstractSerializer {
         return new BinaryBackendEntry(type, new BinaryId(idBytes, id));
     }
 
+    /**
+     * HugeVertex 序列化
+     * @param vertex
+     * @return
+     */
     protected final BinaryBackendEntry newBackendEntry(HugeVertex vertex) {
         return newBackendEntry(vertex.type(), vertex.id());
     }
 
+    /**
+     * EDGE序列化，edgeId with direction
+     * owner-vertex + directory + edge-label + sort-values + other-vertex
+     * @param edge
+     * @return
+     */
     protected final BinaryBackendEntry newBackendEntry(HugeEdge edge) {
         BinaryId id = new BinaryId(formatEdgeName(edge),
                                    edge.idWithDirection());
         return new BinaryBackendEntry(edge.type(), id);
     }
 
+    /**
+     * 元数据序列化
+     * @param elem
+     * @return
+     */
     protected final BinaryBackendEntry newBackendEntry(SchemaElement elem) {
         return newBackendEntry(elem.type(), elem.id());
     }
@@ -210,8 +236,13 @@ public class BinarySerializer extends AbstractSerializer {
         }
     }
 
+    /**
+     * edge 序列化
+     * @param edge
+     * @return
+     */
     protected byte[] formatEdgeName(HugeEdge edge) {
-        // owner-vertex + dir + edge-label + sort-values + other-vertex
+        // owner-vertex + directory + edge-label + sort-values + other-vertex
         return BytesBuffer.allocate(BytesBuffer.BUF_EDGE_ID)
                           .writeEdgeId(edge.id()).bytes();
     }

@@ -30,12 +30,30 @@ import com.baidu.hugegraph.type.HugeType;
 public abstract class AbstractSerializer
                 implements GraphSerializer, SchemaSerializer {
 
+    /**
+     * 底层数据转换
+     * @param entry
+     * @return
+     */
     protected BackendEntry convertEntry(BackendEntry entry) {
         return entry;
     }
 
+    /**
+     * 通过id查询底层数据Entry
+     * @param type
+     * @param id
+     * @return
+     */
     protected abstract BackendEntry newBackendEntry(HugeType type, Id id);
 
+    /**
+     * 三种查询
+     * Query条件转换
+     * @param type
+     * @param id
+     * @return
+     */
     protected abstract Id writeQueryId(HugeType type, Id id);
 
     protected abstract Query writeQueryEdgeCondition(Query query);
@@ -46,6 +64,7 @@ public abstract class AbstractSerializer
     public Query writeQuery(Query query) {
         HugeType type = query.resultType();
 
+        //edge+conditions查询
         // Serialize edge condition query (TODO: add VEQ(for EOUT/EIN))
         if (type.isEdge() && !query.conditions().isEmpty()) {
             if (!query.ids().isEmpty()) {
@@ -59,6 +78,7 @@ public abstract class AbstractSerializer
             }
         }
 
+        //id查询
         // Serialize id in query
         if (query instanceof IdQuery && !query.ids().isEmpty()) {
             IdQuery result = (IdQuery) query.copy();
@@ -69,6 +89,7 @@ public abstract class AbstractSerializer
             query = result;
         }
 
+        //Query查询
         // Serialize condition(key/value) in query
         if (query instanceof ConditionQuery && !query.conditions().isEmpty()) {
             query = this.writeQueryCondition(query);
