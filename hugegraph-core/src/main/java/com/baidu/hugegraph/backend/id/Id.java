@@ -33,6 +33,14 @@ public interface Id extends Comparable<Id> {
 
     public byte[] asBytes();
 
+    /**
+     * Long -> bytes length
+     * UUID -> 16 {16*byte,1byte*8bit=128bit}
+     * String -> char number
+     * BinaryId -> bytes length
+     * EdgeId -> char number
+     * @return
+     */
     public int length();
 
     public IdType type();

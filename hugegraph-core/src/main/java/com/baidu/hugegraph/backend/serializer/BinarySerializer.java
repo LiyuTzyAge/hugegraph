@@ -69,6 +69,9 @@ import com.baidu.hugegraph.util.JsonUtil;
 import com.baidu.hugegraph.util.NumericUtil;
 import com.baidu.hugegraph.util.StringEncoding;
 
+/**
+ * 序列化过程：对象-》BytesBuffer-》BackendEntry -》send-》data backend write
+ */
 public class BinarySerializer extends AbstractSerializer {
 
     public static final byte[] EMPTY_BYTES = new byte[0];
@@ -79,8 +82,8 @@ public class BinarySerializer extends AbstractSerializer {
      * else stored in rowkey like HBase.
      */
     //Id前缀用于数据分布
-    private final boolean keyWithIdPrefix;      //带Id前缀的键
-    private final boolean indexWithIdPrefix;     //带Id前缀的索引
+    private final boolean keyWithIdPrefix;      //建是否带Id前缀 ，用于数据分布
+    private final boolean indexWithIdPrefix;     //索引是否带Id前缀，用于数据分布
 
     public BinarySerializer() {
         this(true, true);
@@ -139,14 +142,29 @@ public class BinarySerializer extends AbstractSerializer {
         return newBackendEntry(elem.type(), elem.id());
     }
 
+    /**
+     * convert to BinaryBackendEntry
+     * @param entry
+     * @return
+     */
     @Override
     protected BinaryBackendEntry convertEntry(BackendEntry entry) {
         assert entry instanceof BinaryBackendEntry;
         return (BinaryBackendEntry) entry;
     }
 
+    /**
+     * Sysprop 系统属性名称序列化，不包含属性value
+     * 场景1：keyWithIdPrefix 属性以Id作为前缀
+     * 场景2：属性无前缀
+     * @param id
+     * @param col
+     * @return
+     */
     protected byte[] formatSyspropName(Id id, HugeKeys col) {
+        //1=>id.head + id
         int idLen = this.keyWithIdPrefix ? 1 + id.length() : 0;
+        //idLen+(1=sysprop)+(1=HugeKeys.col)
         BytesBuffer buffer = BytesBuffer.allocate(idLen + 1 + 1);
         byte sysprop = HugeType.SYS_PROPERTY.code();
         if (this.keyWithIdPrefix) {
@@ -165,31 +183,50 @@ public class BinarySerializer extends AbstractSerializer {
         return buffer.write(sysprop).write(col.code()).bytes();
     }
 
+    /**
+     * 序列化label id
+     * @param elem
+     * @return
+     */
     protected BackendColumn formatLabel(HugeElement elem) {
         BackendColumn col = new BackendColumn();
+        //序列化属性name；两种格式：id+label;label
         col.name = this.formatSyspropName(elem.id(), HugeKeys.LABEL);
         Id label = elem.schemaLabel().id();
         BytesBuffer buffer = BytesBuffer.allocate(label.length() + 1);
+        //序列化属性id，因为属性唯一，所以id是单一数值或字符串，不包括vertex
         col.value = buffer.writeId(label).bytes();
         return col;
     }
 
+    /**
+     * 序列化属性name
+     * elementId+prop.code+schemId
+     * @param prop
+     * @return
+     */
     protected byte[] formatPropertyName(HugeProperty<?> prop) {
-        Id id = prop.element().id();
+        Id id = prop.element().id();        //elementId
         int idLen = this.keyWithIdPrefix ? 1 + id.length() : 0;
-        Id pkeyId = prop.propertyKey().id();
+        Id pkeyId = prop.propertyKey().id();    //schemId
         BytesBuffer buffer = BytesBuffer.allocate(idLen + 2 + pkeyId.length());
         if (this.keyWithIdPrefix) {
             buffer.writeId(id);
         }
-        buffer.write(prop.type().code());
-        buffer.writeId(pkeyId);
+        buffer.write(prop.type().code());   //prop.code
+        buffer.writeId(pkeyId); //schemId
         return buffer.bytes();
     }
 
+    /**
+     * 序列化property
+     * @param prop
+     * @return
+     */
     protected BackendColumn formatProperty(HugeProperty<?> prop) {
         BytesBuffer buffer = BytesBuffer.allocate(BytesBuffer.BUF_PROPERTY);
-        buffer.writeProperty(prop.propertyKey(), prop.value());
+        buffer.writeProperty(prop.propertyKey(), prop.value());     //序列化value
+        //写入 propertyName 与 value
         return BackendColumn.of(this.formatPropertyName(prop), buffer.bytes());
     }
 

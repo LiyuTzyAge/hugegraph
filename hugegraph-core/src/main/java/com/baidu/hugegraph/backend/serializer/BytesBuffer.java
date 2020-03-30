@@ -45,7 +45,7 @@ import com.baidu.hugegraph.util.StringEncoding;
  */
 public final class BytesBuffer {
 
-    public static final int BYTE_LEN = Byte.BYTES;  //字节长度
+    public static final int BYTE_LEN = Byte.BYTES;  //字节长度 1
     public static final int SHORT_LEN = Short.BYTES;
     public static final int INT_LEN = Integer.BYTES;
     public static final int LONG_LEN = Long.BYTES;
@@ -53,15 +53,15 @@ public final class BytesBuffer {
     public static final int FLOAT_LEN = Float.BYTES;
     public static final int DOUBLE_LEN = Double.BYTES;
 
-    public static final int UINT8_MAX = ((byte) -1) & 0xff;
-    public static final int UINT16_MAX = ((short) -1) & 0xffff;
+    public static final int UINT8_MAX = ((byte) -1) & 0xff; //1111 1111
+    public static final int UINT16_MAX = ((short) -1) & 0xffff; //1111 1111 1111 1111
     public static final long UINT32_MAX = (-1) & 0xffffffffL;
 
-    // NOTE: +1 to let code 0 represent length 1
     public static final int ID_LEN_MASK = 0x7f;
+    // NOTE: +1 to let code 0 represent length 1
     public static final int ID_LEN_MAX = 0x7f + 1; // 128
     public static final int BIG_ID_LEN_MAX = 0x7fff + 1; // 32768
-    // 字节最大值，代表字符串结尾
+    // 字节最大值，代表字符串结尾或null
     public static final byte STRING_ENDING_BYTE = (byte) 0xff;  //byte
 
     public static final int STRING_LEN_MAX = UINT16_MAX;
@@ -73,7 +73,7 @@ public final class BytesBuffer {
     public static final int MAX_BUFFER_CAPACITY = 128 * 1024 * 1024; // 128M
 
     public static final int BUF_EDGE_ID = 128;      //edge id 长度
-    public static final int BUF_PROPERTY = 64;
+    public static final int BUF_PROPERTY = 64;      //property value 初始化长度
 
     /**
      * ByteBuffer nio 缓存
@@ -172,6 +172,11 @@ public final class BytesBuffer {
         return this;
     }
 
+    /**
+     * 写入一个字节
+     * @param val
+     * @return
+     */
     public BytesBuffer write(int val) {
         assert val <= UINT8_MAX;
         require(BYTE_LEN);
@@ -317,7 +322,8 @@ public final class BytesBuffer {
     }
 
     /**
-     * 写入字符串结尾
+     * 写入字符串数据，并添加字符串结尾0xff
+     * 如果val为空，只写入字符串结尾
      * @param val 字符串结尾
      * @return
      */
@@ -353,8 +359,13 @@ public final class BytesBuffer {
         return StringEncoding.decode(bytes);
     }
 
+    /**
+     * 写入一个字节
+     * @param val
+     * @return
+     */
     public BytesBuffer writeUInt8(int val) {
-        assert val <= UINT8_MAX;
+        assert val <= UINT8_MAX;        //小于8位最大值
         this.write(val);
         return this;
     }
@@ -497,6 +508,12 @@ public final class BytesBuffer {
         return value;
     }
 
+    /**
+     * 序列化 property 值
+     * @param pkey
+     * @param value
+     * @return
+     */
     public BytesBuffer writeProperty(PropertyKey pkey, Object value) {
         if (pkey.cardinality() == Cardinality.SINGLE) {
             this.writeProperty(pkey.dataType(), value);
@@ -529,7 +546,7 @@ public final class BytesBuffer {
     }
 
     /**
-     * 根据id类型写入id（Long,String,UUID,EDGE）
+     * 根据id类型写入id，ElementId或SchemaId
      * @param id
      * @return
      */
@@ -539,7 +556,7 @@ public final class BytesBuffer {
 
     /**
      * 根据id类型写入id（Long,String,UUID,EDGE）
-     * 未细看
+     * Id 包括(VertexId，EdgeId），也包括系统属性id（LabelId等）
      * @param id
      * @param big id是否为长id（短：<=128，长：<=32768）
      * @return
@@ -555,37 +572,48 @@ public final class BytesBuffer {
                 // UUID Id
                 byte[] bytes = id.asBytes();
                 assert bytes.length == Id.UUID_LENGTH;
-                this.writeUInt8(0x7f); // 0b01111111 means UUID
-                this.write(bytes);
+                this.writeUInt8(0x7f); // 0b01111111 means UUID 类型头
+                this.write(bytes);  //写入数据
                 break;
             case EDGE:
                 // Edge Id
-                this.writeUInt8(0x7e); // 0b01111110 means EdgeId
+                this.writeUInt8(0x7e); // 0b01111110 means EdgeId 类型头
                 this.writeEdgeId(id);
                 break;
             default:
+                //字符串写入流程 : 写入长度,数据
+                // 数据结构：id长度[0x80+len/0x80+len(high)_len(low)]+实际数据[id.bytes]
                 // String Id
                 bytes = id.asBytes();
                 int len = bytes.length;
                 E.checkArgument(len > 0, "Can't write empty id");
                 //id是否为长id
+                //high | 0x80 功能：在头上补上1码，数值相当于加上0x80
                 if (!big) {
-                    E.checkArgument(len <= ID_LEN_MAX,
+                    E.checkArgument(len <= ID_LEN_MAX,   //(0x7f + 1)=0x80=128
                                     "Id max length is %s, but got %s {%s}",
                                     ID_LEN_MAX, len, id);
+                    //id [1,128]
                     len -= 1; // mapping [1, 128] to [0, 127]
+                    /*
+                    0x80=128 , len [0,127]
+                    len | 0x80 、len < 0x80 --> 0x80<=结果<=255
+                    写入id长度
+                    len | 0x80 --> len+128
+                     */
                     this.writeUInt8(len | 0x80);
                 } else {
+                    //BIG_ID_LEN_MAX 0x7fff + 1;=0x8000=32768 ; 16bit
                     E.checkArgument(len <= BIG_ID_LEN_MAX,
                                     "Big id max length is %s, but got %s {%s}",
                                     BIG_ID_LEN_MAX, len, id);
-                    len -= 1;
-                    int high = len >> 8;
-                    int low = len & 0xff;
-                    this.writeUInt8(high | 0x80);
+                    len -= 1; //[0,BIG_ID_LEN_MAX] 16bit
+                    int high = len >> 8;       //high 8bit
+                    int low = len & 0xff;       // low 8bit
+                    this.writeUInt8(high | 0x80);  //high | 0x80 加上0x80
                     this.writeUInt8(low);
                 }
-                this.write(bytes);
+                this.write(bytes);  //写入数据
                 break;
         }
         return this;
@@ -625,7 +653,8 @@ public final class BytesBuffer {
 
     /**
      * Edge id 序列化，
-     * 格式 owner-vertex + directory + edge-label + sort-values + other-vertex
+     * 格式 owner-vertex + directory + edge-label + [sort-values+0xff] +
+     * other-vertex
      * @param id
      * @return
      */
@@ -634,6 +663,7 @@ public final class BytesBuffer {
         this.writeId(edge.ownerVertexId());
         this.write(edge.directionCode());
         this.writeId(edge.edgeLabelId());
+        //使用0xff代表是否为空
         this.writeStringWithEnding(edge.sortValues());
         this.writeId(edge.otherVertexId());
         return this;
@@ -739,42 +769,52 @@ public final class BytesBuffer {
          *          0b 0111 1110 is used by EdgeId
          */
         int positive = val >= 0 ? 0x08 : 0x00;
-        if (~0x7ffL <= val && val <= 0x7ffL) {
-            int high3bits = (int) (val >> 8) & 0x07;
-            this.writeUInt8(0x00 | positive | high3bits);
-            this.writeUInt8((byte) val);
+        if (~0x7ffL <= val && val <= 0x7ffL) { //~0x7ffL = 2047; 0x7ffL=2047
+            //2 byte
+            int high3bits = (int) (val >> 8) & 0x07;    //取高位3bit值 singlexxx
+            //0x00 | positive | high3bits
+            //拼接Head (0(1 bit) + kind(3 bits) + signed(1 bit)) + xxx
+            this.writeUInt8(0x00 | positive | high3bits); //写入前8bit
+            this.writeUInt8((byte) val);    //写入后8bit
         } else if (~0x7ffffL <= val && val <= 0x7ffffL) {
+            //3 byte
             int high3bits = (int) (val >> 16) & 0x07;
             this.writeUInt8(0x10 | positive | high3bits);
             this.writeShort((short) val);
         } else if (~0x7ffffffL <= val && val <= 0x7ffffffL) {
+            //4 byte
             int high3bits = (int) (val >> 24 & 0x07);
             this.writeUInt8(0x20 | positive | high3bits);
             this.write((byte) (val >> 16));
             this.writeShort((short) val);
         } else if (~0x7ffffffffL <= val && val <= 0x7ffffffffL) {
+            //5 byte
             int high3bits = (int) (val >> 32) & 0x07;
             this.writeUInt8(0x30 | positive | high3bits);
             this.writeInt((int) val);
         } else if (~0x7ffffffffffL <= val && val <= 0x7ffffffffffL) {
+            //6 byte
             int high3bits = (int) (val >> 40) & 0x07;
             this.writeUInt8(0x40 | positive | high3bits);
             this.write((byte) (val >> 32));
             this.writeInt((int) val);
         } else if (~0x7ffffffffffffL <= val && val <= 0x7ffffffffffffL) {
+            //7 byte
             int high3bits = (int) (val >> 48) & 0x07;
             this.writeUInt8(0x50 | positive | high3bits);
             this.writeShort((short) (val >> 32));
             this.writeInt((int) val);
         } else if (~0x7ffffffffffffffL <= val && val <= 0x7ffffffffffffffL) {
+            //8 byte
             int high3bits = (int) (val >> 56) & 0x07;
             this.writeUInt8(0x60 | positive | high3bits);
             this.write((byte) (val >> 48));
             this.writeShort((short) (val >> 32));
             this.writeInt((int) val);
         } else {
+            //9 byte
             // high3bits is always 0b000 for 9 bytes number
-            this.writeUInt8(0x70 | positive);
+            this.writeUInt8(0x70 | positive);   //0111 1000/0111 0000
             this.writeLong(val);
         }
     }
@@ -847,7 +887,11 @@ public final class BytesBuffer {
         return bytes;
     }
 
-
+    /**
+     * 根据dataType，序列化value
+     * @param dataType
+     * @param value
+     */
     private void writeProperty(DataType dataType, Object value) {
         switch (dataType) {
             case BOOLEAN:

@@ -31,6 +31,7 @@ import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.StringEncoding;
 
 /**
+ * 序列化后bytes数据容器
  * BackendEntry对应一个Vertex
  * BackendColumn对应一个Vertex的Property
  */

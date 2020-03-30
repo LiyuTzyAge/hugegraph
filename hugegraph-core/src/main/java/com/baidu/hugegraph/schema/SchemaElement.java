@@ -42,7 +42,7 @@ public abstract class SchemaElement implements Namifiable, Typifiable,
     public static final int NEXT_PRIMITIVE_SYS_ID = 7;
 
     protected final HugeGraph graph;
-
+    //每个schema对应一个id
     private final Id id;
     private final String name;
     private final Userdata userdata;
