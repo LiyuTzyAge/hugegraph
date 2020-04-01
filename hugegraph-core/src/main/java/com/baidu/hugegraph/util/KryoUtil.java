@@ -64,6 +64,11 @@ public final class KryoUtil {
         return kryo().readObject(new Input(value), clazz);
     }
 
+    /**
+     * 对象序列化
+     * @param value
+     * @return
+     */
     public static byte[] toKryoWithType(Object value) {
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
              Output output = new Output(bos, 256)) {
@@ -75,12 +80,23 @@ public final class KryoUtil {
        }
     }
 
+    /**
+     * 反序列化 value
+     * 当前只注册了UUID
+     * @param value
+     * @param <T>
+     * @return
+     */
     @SuppressWarnings("unchecked")
     public static <T> T fromKryoWithType(byte[] value) {
         E.checkState(value != null,  "Kryo value can't be null for object");
         return (T) kryo().readClassAndObject(new Input(value));
     }
 
+    /**
+     * 向kryo注册序列化器，只针对UUID
+     * @param kryo
+     */
     private static void registerSerializers(Kryo kryo) {
         kryo.addDefaultSerializer(UUID.class, new Serializer<UUID>() {
 

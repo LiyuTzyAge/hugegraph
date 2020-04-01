@@ -41,8 +41,12 @@ import com.baidu.hugegraph.util.NumericUtil;
 
 public class HugeIndex implements GraphType {
 
+    //index value
+    //labelIndex = ElementLabel
+    //properIndex = propValue
     private Object fieldValues;
     private IndexLabel indexLabel;
+    //StringIds element=vertex/edge id
     private Set<Id> elementIds;
 
     public HugeIndex(IndexLabel indexLabel) {
@@ -68,6 +72,10 @@ public class HugeIndex implements GraphType {
         return this.indexLabel.indexType().type();
     }
 
+    /**
+     * 返回Index序列化后的id
+     * @return
+     */
     public Id id() {
         return formatIndexId(type(), this.indexLabelId(), this.fieldValues());
     }
@@ -134,6 +142,15 @@ public class HugeIndex implements GraphType {
                              this.fieldValues, this.elementIds);
     }
 
+    /**
+     * 创建IndexIDHash
+     * HashStringValue
+     * 对value进行hash(murmur3)，SchemaId不变，其他与formatIndexId相同
+     * @param type
+     * @param indexLabel
+     * @param fieldValues
+     * @return
+     */
     public static Id formatIndexHashId(HugeType type, Id indexLabel,
                                        Object fieldValues) {
         E.checkState(!type.isRangeIndex(),
@@ -142,6 +159,15 @@ public class HugeIndex implements GraphType {
         return formatIndexId(type, indexLabel, HashUtil.hash(value));
     }
 
+    /**
+     * 创建IndexID ,将schemaId 与value组合
+     * String:  "schemaId:value(str)" ==>StringId
+     * Range:   "schemaId(int) value(number)"  =>BinaryId
+     * @param type
+     * @param indexLabel
+     * @param fieldValues
+     * @return
+     */
     public static Id formatIndexId(HugeType type, Id indexLabel,
                                    Object fieldValues) {
         if (type.isStringIndex()) {
@@ -150,8 +176,10 @@ public class HugeIndex implements GraphType {
              * Modify order between index label and field-values to put the
              * index label in front(hugegraph-1317)
              */
+            //id:value(str) ==>StringId
             return SplicingIdGenerator.splicing(indexLabel.asString(), v);
         } else {
+            //schemaId value(number)    =>BinaryId
             assert type.isRangeIndex();
             int length = type.isRange4Index() ? 4 : 8;
             BytesBuffer buffer = BytesBuffer.allocate(4 + length);

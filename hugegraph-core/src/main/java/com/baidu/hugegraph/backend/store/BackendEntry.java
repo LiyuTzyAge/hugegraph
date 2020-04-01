@@ -33,12 +33,19 @@ import com.baidu.hugegraph.util.StringEncoding;
 /**
  * 序列化后bytes数据容器
  * BackendEntry对应一个Vertex
- * BackendColumn对应一个Vertex的Property
+ * BackendColumn：
+ * 1.对应一个Vertex的Property [name=property id,value = property bytes]
+ * 2. 对应一个Edge的多个Propertyes [name=Edgeid,value=properties bytes]
+ *
+ * 面向Key-value系统
+ * BackendColumn.name = key;
+ * BackendColumn.value = value;
  */
 public interface BackendEntry extends Idfiable {
 
     public static class BackendColumn implements Comparable<BackendColumn> {
 
+        //name 保存EdgeId时无megic
         public byte[] name;
         public byte[] value;
 

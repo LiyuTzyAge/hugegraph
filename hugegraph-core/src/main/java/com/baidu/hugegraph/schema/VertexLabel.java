@@ -33,7 +33,7 @@ import com.baidu.hugegraph.type.HugeType;
 import com.baidu.hugegraph.type.define.IdStrategy;
 
 public class VertexLabel extends SchemaLabel {
-
+    //空
     public static final VertexLabel NONE =
                         new VertexLabel(null, IdGenerator.of(0), "");
 

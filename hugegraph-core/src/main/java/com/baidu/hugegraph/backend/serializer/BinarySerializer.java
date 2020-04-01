@@ -82,7 +82,9 @@ public class BinarySerializer extends AbstractSerializer {
      * else stored in rowkey like HBase.
      */
     //Id前缀用于数据分布
-    private final boolean keyWithIdPrefix;      //建是否带Id前缀 ，用于数据分布
+    //(sys-prop,user-pro,edge-name) 是否带Id前缀
+    private final boolean keyWithIdPrefix;
+    // 是否带Id前缀 ，用于数据分布
     private final boolean indexWithIdPrefix;     //索引是否带Id前缀，用于数据分布
 
     public BinarySerializer() {
@@ -220,6 +222,7 @@ public class BinarySerializer extends AbstractSerializer {
 
     /**
      * 序列化property
+     * name+bytes
      * @param prop
      * @return
      */
@@ -230,17 +233,25 @@ public class BinarySerializer extends AbstractSerializer {
         return BackendColumn.of(this.formatPropertyName(prop), buffer.bytes());
     }
 
+    /**
+     * 反序列化属性
+     * @param pkeyId
+     * @param buffer
+     * @param owner
+     */
     protected void parseProperty(Id pkeyId, BytesBuffer buffer,
                                  HugeElement owner) {
+        //get Property schema meta
         PropertyKey pkey = owner.graph().propertyKey(pkeyId);
 
-        // Parse value
+        // Parse value from bytesBuffer
         Object value = buffer.readProperty(pkey);
 
         // Set properties of vertex/edge
         if (pkey.cardinality() == Cardinality.SINGLE) {
             owner.addProperty(pkey, value);
         } else {
+            //Set or List
             if (!(value instanceof Collection)) {
                 throw new BackendException(
                           "Invalid value of non-single property: %s", value);
@@ -251,6 +262,13 @@ public class BinarySerializer extends AbstractSerializer {
         }
     }
 
+    /**
+     * 边 property
+     * 批量序列化多个属性 与 formatproperty格式不同
+     * size+[property_id+property_value]
+     * @param props
+     * @param buffer
+     */
     protected void formatProperties(Collection<HugeProperty<?>> props,
                                     BytesBuffer buffer) {
         // Write properties size
@@ -259,11 +277,20 @@ public class BinarySerializer extends AbstractSerializer {
         // Write properties data
         for (HugeProperty<?> property : props) {
             PropertyKey pkey = property.propertyKey();
+            //property id
             buffer.writeVInt(SchemaElement.schemaId(pkey.id()));
+            //property value
             buffer.writeProperty(pkey, property.value());
         }
     }
 
+    /**
+     * Edge/Vertex property
+     * 反序列化 多个property
+     * 结构 size+[property_id+property_value]
+     * @param buffer
+     * @param owner
+     */
     protected void parseProperties(BytesBuffer buffer, HugeElement owner) {
         int size = buffer.readVInt();
         assert size >= 0;
@@ -274,7 +301,7 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
-     * edge 序列化
+     * edge id 序列化
      * @param edge
      * @return
      */
@@ -284,8 +311,15 @@ public class BinarySerializer extends AbstractSerializer {
                           .writeEdgeId(edge.id()).bytes();
     }
 
+    /**
+     * 序列化Edge properties
+     * 多个property可以写在一起
+     * @param edge
+     * @return
+     */
     protected byte[] formatEdgeValue(HugeEdge edge) {
         int propsCount = edge.getProperties().size();
+        //size=4byte,id=4byte,value=12byte
         BytesBuffer buffer = BytesBuffer.allocate(4 + 16 * propsCount);
 
         // Write edge id
@@ -297,6 +331,11 @@ public class BinarySerializer extends AbstractSerializer {
         return buffer.bytes();
     }
 
+    /**
+     * 序列化Edge
+     * @param edge
+     * @return
+     */
     protected BackendColumn formatEdge(HugeEdge edge) {
         byte[] name;
         if (this.keyWithIdPrefix) {
@@ -307,30 +346,42 @@ public class BinarySerializer extends AbstractSerializer {
         return BackendColumn.of(name, this.formatEdgeValue(edge));
     }
 
+    /**
+     * 反序列化Edge，无properties
+     * EdgeId 不包含 Megic
+     * @param col 由发起点查询得到的edge
+     * @param vertex 发起点、参照点
+     * @param graph
+     */
     protected void parseEdge(BackendColumn col, HugeVertex vertex,
                              HugeGraph graph) {
         // owner-vertex + dir + edge-label + sort-values + other-vertex
 
         BytesBuffer buffer = BytesBuffer.wrap(col.name);
         if (this.keyWithIdPrefix) {
+            //BackendColumn.name 序列化EdgeId时无Megic
             // Consume owner-vertex id
-            buffer.readId();
+            buffer.readId();    //owner
         }
-        byte type = buffer.read();
-        Id labelId = buffer.readId();
-        String sk = buffer.readStringWithEnding();
-        Id otherVertexId = buffer.readId();
+        byte type = buffer.read();  //dir
+        Id labelId = buffer.readId();   //label
+        String sk = buffer.readStringWithEnding(); //sort
+        Id otherVertexId = buffer.readId(); //other
 
+        //创建Edge
         boolean isOutEdge = (type == HugeType.EDGE_OUT.code());
         EdgeLabel edgeLabel = graph.edgeLabel(labelId);
+        //元数据中定义的src与target的label
         VertexLabel srcLabel = graph.vertexLabel(edgeLabel.sourceLabel());
         VertexLabel tgtLabel = graph.vertexLabel(edgeLabel.targetLabel());
 
         HugeVertex otherVertex;
         if (isOutEdge) {
+            //vertex-->other ==> vertex=src , other=tgt
             vertex.vertexLabel(srcLabel);
             otherVertex = new HugeVertex(graph, otherVertexId, tgtLabel);
         } else {
+            //vertex<--other ==> vertex=tgt , other=src
             vertex.vertexLabel(tgtLabel);
             otherVertex = new HugeVertex(graph, otherVertexId, srcLabel);
         }
@@ -340,6 +391,7 @@ public class BinarySerializer extends AbstractSerializer {
         edge.vertices(isOutEdge, vertex, otherVertex);
         edge.assignId();
 
+        //Vertex cache edge，Edge cache vertex
         if (isOutEdge) {
             vertex.addOutEdge(edge);
             otherVertex.addInEdge(edge.switchOwner());
@@ -360,11 +412,21 @@ public class BinarySerializer extends AbstractSerializer {
         this.parseProperties(buffer, edge);
     }
 
+    /**
+     * 反序列化 column
+     * type in (HugeType.PROPERTY.code()、HugeType.EDGE_IN.code()、HugeType
+     * .EDGE_OUT.code()、HugeType.SYS_PROPERTY.code())
+     * 根据type类型做对应的反序列化
+     * @param col
+     * @param vertex
+     */
     protected void parseColumn(BackendColumn col, HugeVertex vertex) {
         BytesBuffer buffer = BytesBuffer.wrap(col.name);
         Id id = this.keyWithIdPrefix ? buffer.readId() : vertex.id();
+        //如果keyWithIdPrefix=false，formatEdge时name=Empty，则type为空，buffer.remaining()
+        //TODO:????
         E.checkState(buffer.remaining() > 0, "Missing column type");
-        byte type = buffer.read();
+        byte type = buffer.read();  //prop.code
         // Parse property
         if (type == HugeType.PROPERTY.code()) {
             Id pkeyId = buffer.readId();
@@ -386,35 +448,54 @@ public class BinarySerializer extends AbstractSerializer {
         }
     }
 
+    /**
+     * 序列化 HugeIndexName
+     * 格式
+     * indexWithIdPrefix =》index-id element-id (vertex/edge)-ID
+     * ！indexWithIdPrefix =》element-id (vertex/edge)-ID
+     * @param index
+     * @return
+     */
     protected byte[] formatIndexName(HugeIndex index) {
         BytesBuffer buffer;
+        //IndexId用于数据分布，反序列化时无用
         if (!this.indexWithIdPrefix) {
-            Id elemId = index.elementId();
+            //only element-id ?? value写在哪？？
+            Id elemId = index.elementId();      //elementId
             int idLen = 1 + elemId.length();
             buffer = BytesBuffer.allocate(idLen);
             // Write element-id
             buffer.writeId(elemId, true);
         } else {
             Id indexId = index.id();
-            HugeType type = index.type();
+            HugeType type = index.type();   //如 RANGE_INT_INDEX
+            //String index
             if (!type.isNumericIndex() && indexIdLengthExceedLimit(indexId)) {
-                indexId = index.hashId();
+                indexId = index.hashId();       //hashIndexId
             }
-            Id elemId = index.elementId();
+            Id elemId = index.elementId();      //elementId
+            //1 = Ending ; 1 = megic
             int idLen = 1 + elemId.length() + 1 + indexId.length();
             buffer = BytesBuffer.allocate(idLen);
             // Write index-id
             buffer.writeIndexId(indexId, type);
             // Write element-id
-            buffer.writeId(elemId);
+            buffer.writeId(elemId);     //index-id element-id
         }
 
         return buffer.bytes();
     }
 
+    /**
+     * 反序列化IndexName
+     * @param entry
+     * @param index
+     * @param fieldValues
+     */
     protected void parseIndexName(BinaryBackendEntry entry, HugeIndex index,
                                   Object fieldValues) {
         for (BackendColumn col : entry.columns()) {
+            //匹配索引值 默认使用字符串比较
             if (indexFieldValuesUnmatched(col.value, fieldValues)) {
                 // Skip if field-values is not matched (just the same hash)
                 continue;
@@ -427,28 +508,43 @@ public class BinarySerializer extends AbstractSerializer {
         }
     }
 
+    /**
+     * 序列化Vertex与properties
+     * 格式：BackendEntry.col(name=vertex-id,value= labelId+size+properties)
+     * @param vertex
+     * @return
+     */
     @Override
     public BackendEntry writeVertex(HugeVertex vertex) {
-        BinaryBackendEntry entry = newBackendEntry(vertex);
+        BinaryBackendEntry entry = newBackendEntry(vertex); //type vertex-id
 
         if (vertex.removed()) {
             return entry;
         }
 
         int propsCount = vertex.getProperties().size();
+        //8=4+4,property=16
         BytesBuffer buffer = BytesBuffer.allocate(8 + 16 * propsCount);
 
         // Write vertex label
-        buffer.writeId(vertex.schemaLabel().id());
+        buffer.writeId(vertex.schemaLabel().id());  //4bit
 
+        //4bit+properties
         // Write all properties of the vertex
         this.formatProperties(vertex.getProperties().values(), buffer);
 
+        //name=vertex-id value= labelId+size+properties
         entry.column(entry.id().asBytes(), buffer.bytes());
 
         return entry;
     }
 
+    /**
+     * 反序列化Vertex与properties
+     *  vertexlabel+size+[property_id+property_value]
+     * @param value
+     * @param vertex
+     */
     protected void parseVertex(byte[] value, HugeVertex vertex) {
         BytesBuffer buffer = BytesBuffer.wrap(value);
 
@@ -465,6 +561,13 @@ public class BinarySerializer extends AbstractSerializer {
         throw new NotImplementedException("Unsupported writeVertexProperty()");
     }
 
+    /**
+     * read vertex from BackendEntry which is the data of (vertex or edge).
+     * Result is the edge or properties of the vertex.
+     * @param graph
+     * @param bytesEntry
+     * @return
+     */
     @Override
     public HugeVertex readVertex(HugeGraph graph, BackendEntry bytesEntry) {
         if (bytesEntry == null) {
@@ -474,16 +577,20 @@ public class BinarySerializer extends AbstractSerializer {
 
         // Parse id
         Id id = entry.id().origin();
+        //ownerVertexId or vertexId
         Id vid = id.edge() ? ((EdgeId) id).ownerVertexId() : id;
         HugeVertex vertex = new HugeVertex(graph, vid, VertexLabel.NONE);
 
         // Parse all properties and edges of a Vertex
         for (BackendColumn col : entry.columns()) {
             if (entry.type().isEdge()) {
+                //id=EdgeId;entry.type=Edge;col=edge 实际条件
+                //col数据类型为edge，也传入ownerVertex用于存取数据，没有其他意义
                 // NOTE: the entry id type is vertex even if entry type is edge
-                // Parse vertex edges
+                // Parse vertex edges without properties
                 this.parseColumn(col, vertex);
             } else {
+                //数据与index读写是分开的，所以处理vertex else edge
                 assert entry.type().isVertex();
                 // Parse vertex properties
                 assert entry.columnsSize() == 1 : entry.columnsSize();
@@ -849,6 +956,12 @@ public class BinarySerializer extends AbstractSerializer {
         return id.asBytes().length > BytesBuffer.INDEX_HASH_ID_THRESHOLD;
     }
 
+    /**
+     * 字符串比较
+     * @param value
+     * @param fieldValues
+     * @return
+     */
     protected static boolean indexFieldValuesUnmatched(byte[] value,
                                                        Object fieldValues) {
         if (value != null && value.length > 0 && fieldValues != null) {

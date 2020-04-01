@@ -51,7 +51,7 @@ import com.google.common.collect.ImmutableList;
 public class HugeEdge extends HugeElement implements Edge, Cloneable {
 
     protected EdgeLabel label;
-    protected String name;
+    protected String name;      //sortValue
 
     protected HugeVertex sourceVertex;
     protected HugeVertex targetVertex;
@@ -140,6 +140,10 @@ public class HugeEdge extends HugeElement implements Edge, Cloneable {
                !this.isOutEdge && direction == Directions.IN;
     }
 
+    /**
+     * 根据Edge内容，创建Id
+     * 使用场景：如使用默认构造器创建的，id=null
+     */
     @Watched(prefix = "edge")
     public void assignId() {
         // Generate an id and assign

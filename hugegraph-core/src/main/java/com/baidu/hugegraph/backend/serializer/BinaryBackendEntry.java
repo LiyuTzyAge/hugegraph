@@ -36,8 +36,9 @@ import com.baidu.hugegraph.util.E;
 public class BinaryBackendEntry implements BackendEntry {
 
     private static final byte[] EMPTY_BYTES = new byte[]{};
-
+    //IndexType VertexType EdgeType
     private final HugeType type;
+    //vertexId indexId EdgeId ......
     private final BinaryId id;
     private Id subId;
     private final List<BackendColumn> columns;
@@ -165,6 +166,7 @@ public class BinaryBackendEntry implements BackendEntry {
 
     /**
      * 所有ID的二进制表现形式(ByteBuffer)
+     * 二进制ID
      */
     protected static final class BinaryId implements Id {
 

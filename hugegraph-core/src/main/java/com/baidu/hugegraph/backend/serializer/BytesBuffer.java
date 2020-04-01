@@ -60,12 +60,14 @@ public final class BytesBuffer {
     public static final int ID_LEN_MASK = 0x7f;
     // NOTE: +1 to let code 0 represent length 1
     public static final int ID_LEN_MAX = 0x7f + 1; // 128
+    //Id最大长度
     public static final int BIG_ID_LEN_MAX = 0x7fff + 1; // 32768
     // 字节最大值，代表字符串结尾或null
     public static final byte STRING_ENDING_BYTE = (byte) 0xff;  //byte
 
     public static final int STRING_LEN_MAX = UINT16_MAX;
 
+    //字符串Hash类型index id字节最大长度
     // The value must be in range [8, ID_LEN_MAX]
     public static final int INDEX_HASH_ID_THRESHOLD = 32;
 
@@ -125,6 +127,10 @@ public final class BytesBuffer {
         return this.buffer.array();
     }
 
+    /**
+     * 返回position内有效的字节数组
+     * @return
+     */
     public byte[] bytes() {
         byte[] bytes = this.buffer.array();
         if (this.buffer.position() == bytes.length) {
@@ -251,10 +257,19 @@ public final class BytesBuffer {
         return this.buffer.get(this.buffer.capacity() - 1);
     }
 
+    /**
+     * 读取一个Byte
+     * @return
+     */
     public byte read() {
         return this.buffer.get();
     }
 
+    /**
+     * 读取多个byte
+     * @param length 字节长度
+     * @return
+     */
     public byte[] read(int length) {
         byte[] bytes = new byte[length];
         this.buffer.get(bytes);
@@ -299,6 +314,10 @@ public final class BytesBuffer {
         return this;
     }
 
+    /**
+     * bytes 底层结构【length+bytes】
+     * @return
+     */
     public byte[] readBytes() {
         int length = this.readVInt();
         assert length >= 0;
@@ -371,7 +390,7 @@ public final class BytesBuffer {
     }
 
     public int readUInt8() {
-        return this.read() & 0x000000ff;
+        return this.read() & 0x000000ff;    //11111111
     }
 
     public BytesBuffer writeUInt16(int val) {
@@ -394,32 +413,57 @@ public final class BytesBuffer {
         return this.readInt() & 0xffffffffL;
     }
 
+    /**
+     * int类型序列化
+     * 根据value大小决定写入几个byte，最少写入1个，最大写入5个
+     * 可以实现边写入边压缩
+     * 如果数值较大，截断分多次写入，第一次写入4bit，之后每次写入7bit
+     * (0x80|) 高位=0 代表数据结尾，=1代表后面还有数据
+     * @param value 有符号整数
+     * @return
+     */
     public BytesBuffer writeVInt(int value) {
+        // 0x7f=01111111
         // NOTE: negative numbers are not compressed
         if (value > 0x0fffffff || value < 0) {
+            //写入实际数据高4bit[1bit-4bit]=4bit
+            //1000 xxxx
             this.write(0x80 | ((value >>> 28) & 0x7f));
         }
         if (value > 0x1fffff || value < 0) {
+            //写入[高5bit-高11bit]=7bit
+            //1xxx xxxx
             this.write(0x80 | ((value >>> 21) & 0x7f));
         }
         if (value > 0x3fff || value < 0) {
+            //写入[高12bit-高18bit]=7bit
+            //1xxx xxxx
             this.write(0x80 | ((value >>> 14) & 0x7f));
         }
         if (value > 0x7f || value < 0) {
+            //写入[高19bit-高25bit]=7bit
+            //1xxx xxxx
             this.write(0x80 | ((value >>>  7) & 0x7f));
         }
+        //写入[高26bit-高32bit]=7bit
+        //0xxx xxxx
         this.write(value & 0x7f);
 
         return this;
     }
 
+    /**
+     * int 反序列化
+     * @return
+     */
     public int readVInt() {
         byte leading = this.read();
+        //正常数据中不存在 0x80
         E.checkArgument(leading != 0x80,
                         "Unexpected varint with leading byte '0x%s'",
                         Bytes.toHex(leading));
-        int value = leading & 0x7f;
-        if (leading >= 0) {
+        int value = leading & 0x7f;     //& 0x7f=01111111=去掉了第一个字符
+        if (leading >= 0) {      //0xxx xxxx
             assert (leading & 0x80) == 0;
             return value;
         }
@@ -428,10 +472,10 @@ public final class BytesBuffer {
         for (; i < 5; i++) {
             byte b = this.read();
             if (b >= 0) {
-                value = b | (value << 7);
+                value = b | (value << 7);       //添加低7bit
                 break;
             } else {
-                value = (b & 0x7f) | (value << 7);
+                value = (b & 0x7f) | (value << 7);  //去掉了第一个字符,添加低7bit
             }
         }
 
@@ -444,6 +488,11 @@ public final class BytesBuffer {
         return value;
     }
 
+    /**
+     * 序列化方式与int类似，最高位标识结尾，每次写入7bit
+     * @param value
+     * @return
+     */
     public BytesBuffer writeVLong(long value) {
         if (value < 0) {
             this.write((byte) 0x81);
@@ -530,15 +579,24 @@ public final class BytesBuffer {
         return this;
     }
 
+    /**
+     * 反序列化 Property 值
+     * SINGLE 模式：直接返回property值
+     * Collection 模式：返回Collection
+     * @param pkey
+     * @return
+     */
     public Object readProperty(PropertyKey pkey) {
         if (pkey.cardinality() == Cardinality.SINGLE) {
-            return this.readProperty(pkey.dataType());
+            return this.readProperty(pkey.dataType());  //pkey.dataType()
+            // 返回value内部数据类型
         }
 
         assert pkey.cardinality() == Cardinality.LIST ||
                pkey.cardinality() == Cardinality.SET;
+        //符合序列化数据结构： size+data[]
         int size = this.readVInt();
-        Collection<Object> values = pkey.newValue();
+        Collection<Object> values = pkey.newValue();    //返回value的实例
         for (int i = 0; i < size; i++) {
             values.add(this.readProperty(pkey.dataType()));
         }
@@ -555,8 +613,10 @@ public final class BytesBuffer {
     }
 
     /**
+     *
      * 根据id类型写入id（Long,String,UUID,EDGE）
      * Id 包括(VertexId，EdgeId），也包括系统属性id（LabelId等）
+     * 注：EdgeId 包含Megic
      * @param id
      * @param big id是否为长id（短：<=128，长：<=32768）
      * @return
@@ -623,8 +683,15 @@ public final class BytesBuffer {
         return this.readId(false);
     }
 
+    /**
+     * Id 反序列化 （UUID、EdgeId、NumberId/StringId）
+     * 注：EdgeId 包含 megic
+     * @param big
+     * @return
+     */
     public Id readId(boolean big) {
         byte b = this.read();
+        //判断megic first bit
         boolean number = (b & 0x80) == 0;
         if (number) {
             if (b == 0x7f) {
@@ -652,7 +719,7 @@ public final class BytesBuffer {
     }
 
     /**
-     * Edge id 序列化，
+     * Edge id 序列化，不包含Megic
      * 格式 owner-vertex + directory + edge-label + [sort-values+0xff] +
      * other-vertex
      * @param id
@@ -669,6 +736,10 @@ public final class BytesBuffer {
         return this;
     }
 
+    /**
+     * 反序列化Edge id，不包含Megic
+     * @return
+     */
     public Id readEdgeId() {
         return new EdgeId(this.readId(), EdgeId.directionFromCode(this.read()),
                           this.readId(), this.readStringWithEnding(),
@@ -712,6 +783,11 @@ public final class BytesBuffer {
         return this;
     }
 
+    /**
+     * 反序列化 IndexId
+     * @param type
+     * @return BinaryId
+     */
     public BinaryId readIndexId(HugeType type) {
         byte[] id;
         if (type.isRange4Index()) {
@@ -771,6 +847,7 @@ public final class BytesBuffer {
         int positive = val >= 0 ? 0x08 : 0x00;
         if (~0x7ffL <= val && val <= 0x7ffL) { //~0x7ffL = 2047; 0x7ffL=2047
             //2 byte
+            //截取11bit之内的数据->4+1+11=16bit
             int high3bits = (int) (val >> 8) & 0x07;    //取高位3bit值 singlexxx
             //0x00 | positive | high3bits
             //拼接Head (0(1 bit) + kind(3 bits) + signed(1 bit)) + xxx
@@ -778,6 +855,7 @@ public final class BytesBuffer {
             this.writeUInt8((byte) val);    //写入后8bit
         } else if (~0x7ffffL <= val && val <= 0x7ffffL) {
             //3 byte
+            //截取17bit之内的数据->4+1+11=16bit
             int high3bits = (int) (val >> 16) & 0x07;
             this.writeUInt8(0x10 | positive | high3bits);
             this.writeShort((short) val);
@@ -819,6 +897,11 @@ public final class BytesBuffer {
         }
     }
 
+    /**
+     * 反序列化Long number
+     * @param b
+     * @return
+     */
     private long readNumber(byte b) {
         E.checkArgument((b & 0x80) == 0,
                         "Not a number type with prefix byte '0x%s'",
@@ -867,6 +950,10 @@ public final class BytesBuffer {
         return value;
     }
 
+    /**
+     * 读取bytes直到 STRING_ENDING_BYTE
+     * @return
+     */
     private byte[] readBytesWithEnding() {
         int start = this.buffer.position();
         boolean foundEnding =false;
@@ -881,10 +968,13 @@ public final class BytesBuffer {
         E.checkArgument(foundEnding, "Not found ending '0x%s'",
                         Bytes.toHex(STRING_ENDING_BYTE));
         int end = this.buffer.position() - 1;
+        //计算由start到end字节长度
         int len = end - start;
         byte[] bytes = new byte[len];
+        //数组拷贝
         System.arraycopy(this.array(), start, bytes, 0, len);
         return bytes;
+        //一次性连续读，批量数据拷贝
     }
 
     /**
@@ -933,29 +1023,46 @@ public final class BytesBuffer {
         }
     }
 
+    /**
+     * 根据DataType 反序列化value
+     * int与long 使用了自己定义的序列化算法
+     * @param dataType
+     * @return
+     */
     private Object readProperty(DataType dataType) {
         switch (dataType) {
             case BOOLEAN:
+                //0000 000x
                 return this.readVInt() == 1;
             case BYTE:
+                //xxxx xxxx
                 return (byte) this.readVInt();
             case INT:
+                //自定义Int结构
                 return this.readVInt();
             case FLOAT:
+                //xxxx xxxx xxxx xxxx
                 return this.readFloat();
             case LONG:
+                //自定义Long结构
                 return this.readVLong();
             case DATE:
+                //自定义结构
                 return new Date(this.readVLong());
             case DOUBLE:
+                //xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
                 return this.readDouble();
             case TEXT:
                 return this.readString();
             case BLOB:
+                //length+bytes[]
                 return this.readBytes();
             case UUID:
+                //64bit+64bit=128bit
+                //long+long
                 return new UUID(this.readLong(), this.readLong());
             default:
+                //length+bytes[] ->尝试解析为UUID
                 return KryoUtil.fromKryoWithType(this.readBytes());
         }
     }

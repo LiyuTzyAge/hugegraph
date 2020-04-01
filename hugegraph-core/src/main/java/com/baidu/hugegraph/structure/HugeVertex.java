@@ -64,7 +64,7 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
     protected GraphTransaction tx;
     protected VertexLabel label;
     protected String name;
-    protected Set<HugeEdge> edges;
+    protected Set<HugeEdge> edges;  //缓存关联边
 
     public HugeVertex(final GraphTransaction tx, Id id, VertexLabel label) {
         this(tx.graph(), id, label);

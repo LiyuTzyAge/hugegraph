@@ -112,6 +112,10 @@ public class PropertyKey extends SchemaElement implements Propfiable {
         }
     }
 
+    /**
+     * 返回属性值的Class
+     * @return
+     */
     public Class<?> implementClazz() {
         Class<?> cls;
         switch (this.cardinality) {
