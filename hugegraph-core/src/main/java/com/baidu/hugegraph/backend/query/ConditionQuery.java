@@ -151,7 +151,7 @@ public final class ConditionQuery extends IdQuery {
     /**
      * 返回key对应的输入条件值，
      * 计算类型必须是EQ
-     * @param key
+     * @param key 如：HugeKeys.OWNER_VERTEX、HugeKeys.DIRECTION
      * @param <T>
      * @return
      */
@@ -259,6 +259,11 @@ public final class ConditionQuery extends IdQuery {
         return conds;
     }
 
+    /**
+     *
+     * @param key 如：SORT_VALUES、HugeKeys.FIELD_VALUES
+     * @return
+     */
     public List<Condition> syspropConditions(HugeKeys key) {
         this.checkFlattened();
         List<Condition> conditions = new ArrayList<>();

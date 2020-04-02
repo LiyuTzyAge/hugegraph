@@ -25,10 +25,14 @@ import com.baidu.hugegraph.type.HugeType;
 import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.E;
 
+/**
+ * id范围查询[start,end]
+ * 用于EdgeId，根据sortValue范围查询
+ */
 public final class IdRangeQuery extends Query {
-
-    private final Id start;
-    private final Id end;
+    //ownerVertex+dir+labelId+sortValue
+    private final Id start; //BinaryId
+    private final Id end;   //BinaryId
     private final boolean inclusiveStart;
     private final boolean inclusiveEnd;
 

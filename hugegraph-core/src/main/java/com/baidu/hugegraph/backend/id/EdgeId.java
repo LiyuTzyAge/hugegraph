@@ -35,7 +35,7 @@ import com.baidu.hugegraph.util.StringEncoding;
  * to 2 owner vertex)
  */
 public class EdgeId implements Id {
-
+    //底层序列化的格式
     public static final HugeKeys[] KEYS = new HugeKeys[] {
             HugeKeys.OWNER_VERTEX,
             HugeKeys.DIRECTION,

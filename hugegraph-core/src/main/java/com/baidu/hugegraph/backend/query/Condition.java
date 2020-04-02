@@ -654,10 +654,9 @@ public abstract class Condition {
     }
 
     public static class RangeConditions {
-
-        private Object keyEq = null;
-        private Object keyMin = null;
-        private boolean keyMinEq = false;
+        private Object keyEq = null;    //等值匹配
+        private Object keyMin = null;   //最小值
+        private boolean keyMinEq = false;   //是否包含最小值
         private Object keyMax = null;
         private boolean keyMaxEq = false;
 

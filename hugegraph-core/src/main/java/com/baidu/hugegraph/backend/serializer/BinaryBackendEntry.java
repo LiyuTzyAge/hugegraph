@@ -33,6 +33,11 @@ import com.baidu.hugegraph.type.HugeType;
 import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.E;
 
+/**
+ * 序列化 bytes数据类
+ * BackendEntry ：保存 type与id 序列化对象标签信息（Edge，vertex）
+ * BackendColumn ：保存 具体序列化内容
+ */
 public class BinaryBackendEntry implements BackendEntry {
 
     private static final byte[] EMPTY_BYTES = new byte[]{};
@@ -167,6 +172,7 @@ public class BinaryBackendEntry implements BackendEntry {
     /**
      * 所有ID的二进制表现形式(ByteBuffer)
      * 二进制ID
+     * 用于与底层交互，所有的ID都要转换成BinaryId
      */
     protected static final class BinaryId implements Id {
 

@@ -124,7 +124,7 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
-     * EDGE序列化，edgeId with direction
+     * EDGE序列化，edgeId with direction of BinaryId
      * owner-vertex + directory + edge-label + sort-values + other-vertex
      * @param edge
      * @return
@@ -301,7 +301,7 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
-     * edge id 序列化
+     * edge id 序列化,无Megic
      * @param edge
      * @return
      */
@@ -413,7 +413,7 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
-     * 反序列化 column
+     * 反序列化 column，每个column保存单个property与edge
      * type in (HugeType.PROPERTY.code()、HugeType.EDGE_IN.code()、HugeType
      * .EDGE_OUT.code()、HugeType.SYS_PROPERTY.code())
      * 根据type类型做对应的反序列化
@@ -488,6 +488,7 @@ public class BinarySerializer extends AbstractSerializer {
 
     /**
      * 反序列化IndexName
+     * Index->Index(elementId)
      * @param entry
      * @param index
      * @param fieldValues
@@ -565,7 +566,7 @@ public class BinarySerializer extends AbstractSerializer {
      * read vertex from BackendEntry which is the data of (vertex or edge).
      * Result is the edge or properties of the vertex.
      * @param graph
-     * @param bytesEntry
+     * @param bytesEntry 可能是Edge或Vertex
      * @return
      */
     @Override
@@ -601,6 +602,12 @@ public class BinarySerializer extends AbstractSerializer {
         return vertex;
     }
 
+    /**
+     * 序列化 Edge ，BackendEntry(EdgeType,Edge.BinaryId)
+     * BackendColumn 保存具体信息
+     * @param edge
+     * @return
+     */
     @Override
     public BackendEntry writeEdge(HugeEdge edge) {
         BinaryBackendEntry entry = newBackendEntry(edge);
@@ -619,10 +626,20 @@ public class BinarySerializer extends AbstractSerializer {
         throw new NotImplementedException("Unsupported readEdge()");
     }
 
+    /**
+     * 索引对象序列化
+     * index.id + type -> BackendEntry.id+type
+     * index.formatIndexName -> column.name
+     *       -> column.value = null or value = index.fieldValues
+     * 注：type 非 numberic，并且indexId超长，则进行Hash IndexId
+     * @param index
+     * @return
+     */
     @Override
     public BackendEntry writeIndex(HugeIndex index) {
         BinaryBackendEntry entry;
         if (index.fieldValues() == null && index.elementIds().size() == 0) {
+            //当这个条件成立，说明根据indexLabel删除整个Index
             /*
              * When field-values is null and elementIds size is 0, it is
              * meaningful for deletion of index data by index label.
@@ -630,8 +647,8 @@ public class BinarySerializer extends AbstractSerializer {
              */
             entry = this.formatILDeletion(index);
         } else {
-            Id id = index.id();
-            HugeType type = index.type();
+            Id id = index.id(); //BackendEntry id
+            HugeType type = index.type(); //BackendEntry type
             byte[] value = null;
             if (!type.isNumericIndex() && indexIdLengthExceedLimit(id)) {
                 id = index.hashId();
@@ -640,12 +657,21 @@ public class BinarySerializer extends AbstractSerializer {
             }
 
             entry = newBackendEntry(type, id);
+            //value=null else (!type.isNumericIndex() && indexIdLengthExceedLimit(id))
             entry.column(this.formatIndexName(index), value);
             entry.subId(index.elementId());
         }
         return entry;
     }
 
+    /**
+     * 根据查询反序列化Index
+     * ConditionQuery+BackendEntry->Index(label,value,ElementId)
+     * @param graph
+     * @param query 索引查询条件
+     * @param bytesEntry 索引查询结果
+     * @return Index(label,value,ElementId)
+     */
     @Override
     public HugeIndex readIndex(HugeGraph graph, ConditionQuery query,
                                BackendEntry bytesEntry) {
@@ -655,31 +681,49 @@ public class BinarySerializer extends AbstractSerializer {
 
         BinaryBackendEntry entry = this.convertEntry(bytesEntry);
         // NOTE: index id without length prefix
-        byte[] bytes = entry.id().asBytes();
+        byte[] bytes = entry.id().asBytes();    //indexId
+        //Index(label,value)
         HugeIndex index = HugeIndex.parseIndexId(graph, entry.type(), bytes);
 
         Object fieldValues = null;
+        //字符串index修正value-hash值
         if (!index.type().isRangeIndex()) {
+            //查询条件中HugeKeys.FIELD_VALUES对应的值
+            //即查询索引的条件值，字符串是等值匹配
             fieldValues = query.condition(HugeKeys.FIELD_VALUES);
+            //value是hash值时，不相等
             if (!index.fieldValues().equals(fieldValues)) {
                 // Update field-values for hashed index-id
-                index.fieldValues(fieldValues);
+                index.fieldValues(fieldValues); //替换掉hash值
             }
         }
-
+        //Index(label,value)->Index(label,value,ElementId)
         this.parseIndexName(entry, index, fieldValues);
         return index;
     }
 
+    /**
+     * (type,id)->BackendEntry
+     * @param type
+     * @param id
+     * @return
+     */
     @Override
     public BackendEntry writeId(HugeType type, Id id) {
         return newBackendEntry(type, id);
     }
 
+    /**
+     * id->EdgeId/normalId->BinaryId
+     * BinaryId用于与底层交互
+     * @param type
+     * @param id
+     * @return
+     */
     @Override
     protected Id writeQueryId(HugeType type, Id id) {
         if (type.isEdge()) {
-            id = writeEdgeId(id);
+            id = writeEdgeId(id);   //BinaryId
         } else {
             BytesBuffer buffer = BytesBuffer.allocate(1 + id.length());
             id = new BinaryId(buffer.writeId(id).bytes(), id);
@@ -687,28 +731,47 @@ public class BinarySerializer extends AbstractSerializer {
         return id;
     }
 
+    /**
+     *Edge查询序列化
+     * @param query
+     * @return
+     */
     @Override
     protected Query writeQueryEdgeCondition(Query query) {
         ConditionQuery cq = (ConditionQuery) query;
         if (cq.hasRangeCondition()) {
+            //Edge range query
             return this.writeQueryEdgeRangeCondition(cq);
         } else {
+            //Edge prefix query
             return this.writeQueryEdgePrefixCondition(cq);
         }
     }
 
+    /**
+     * Edge Range场景查询序列化
+     * 将原始查询条件 cq，提取 EdgeRange
+     * 必要区间条件（OWNER_VERTEX，DIRECTION,EDGElABEL,min，max等），
+     * 将区间条件序列化构造startID与endID BinaryId，
+     * 最后封装成：IdPrefixQuery（如果Max=null），IdRangeQuery 进行后续查询
+     * @param cq
+     * @return
+     */
     private Query writeQueryEdgeRangeCondition(ConditionQuery cq) {
+        //The SORT_VALUES Conditions
         List<Condition> sortValues = cq.syspropConditions(HugeKeys.SORT_VALUES);
+        //[x,y]
         E.checkArgument(sortValues.size() >= 1 && sortValues.size() <= 2,
                         "Edge range query must be with sort-values range");
         // Would ignore target vertex
-        Id vertex = cq.condition(HugeKeys.OWNER_VERTEX);
-        Directions direction = cq.condition(HugeKeys.DIRECTION);
+        Id vertex = cq.condition(HugeKeys.OWNER_VERTEX);    //ownerVertex
+        Directions direction = cq.condition(HugeKeys.DIRECTION);    //dir
         if (direction == null) {
-            direction = Directions.OUT;
+            direction = Directions.OUT; //default out
         }
-        Id label = cq.condition(HugeKeys.LABEL);
-
+        Id label = cq.condition(HugeKeys.LABEL);    //edge label
+        //序列化查询条件，构造start与end BinaryID
+        //ownerVertex+dir+labelId+(sortValue+otherVertex)
         int size = 1 + vertex.length() + 1 + label.length() + 16;
         BytesBuffer start = BytesBuffer.allocate(size);
         start.writeId(vertex);
@@ -717,20 +780,30 @@ public class BinarySerializer extends AbstractSerializer {
 
         BytesBuffer end = BytesBuffer.allocate(size);
         end.copyFrom(start);
+        //start=end:ownerVertex+dir+labelId+
 
         RangeConditions range = new RangeConditions(sortValues);
+        //[x,]
         if (range.keyMin() != null) {
+            //将上界以UTF-8序列化
             start.writeStringRaw((String) range.keyMin());
         }
+        //[,y]
         if (range.keyMax() != null) {
+            //将下界以UTF-8序列化
             end.writeStringRaw((String) range.keyMax());
         }
         // Sort-value will be empty if there is no start sort-value
+        // Empty: ownerVertex+dir+labelId+
+        // Not Empty: ownerVertex+dir+labelId+sortValue
         Id startId = new BinaryId(start.bytes(), null);
         // Set endId as prefix if there is no end sort-value
+        // Empty: ownerVertex+dir+labelId+
+        // Not Empty: ownerVertex+dir+labelId+sortValue
         Id endId = new BinaryId(end.bytes(), null);
 
         boolean includeStart = range.keyMinEq();
+        //分页
         if (cq.paging() && !cq.page().isEmpty()) {
             includeStart = true;
             byte[] position = PageState.fromString(cq.page()).position();
@@ -738,16 +811,29 @@ public class BinarySerializer extends AbstractSerializer {
                             "Invalid page out of lower bound");
             startId = new BinaryId(position, null);
         }
+        //无最大值
         if (range.keyMax() == null) {
+            //TODO:使用前缀查询，如何实现数据排序，返回大于start的数据，底层数据就是有序的？
             return new IdPrefixQuery(cq, startId, includeStart, endId);
         }
+        //有最大值，判断条件是否等于最大值
         return new IdRangeQuery(cq, startId, includeStart, endId,
                                 range.keyMaxEq());
     }
 
+    /**
+     * Edge Query序列化
+     * 根据cq 序列化条件EdgeId.KEYS，得到EdgeId.BinaryId，
+     * 最后封装得到IdPrefixQuery
+     * @param cq
+     * @return
+     */
     private Query writeQueryEdgePrefixCondition(ConditionQuery cq) {
         int count = 0;
         BytesBuffer buffer = BytesBuffer.allocate(BytesBuffer.BUF_EDGE_ID);
+        //构建EdgeId查询前缀
+        //min:ownerVertex+dir
+        //max:ownerVertex+dir+labelId+(sortValue+StrEnding)+otherVertex
         for (HugeKeys key : EdgeId.KEYS) {
             Object value = cq.condition(key);
 
@@ -758,6 +844,8 @@ public class BinarySerializer extends AbstractSerializer {
                     // Direction is null, set to OUT
                     value = Directions.OUT;
                 } else {
+                    //ownerVertex+dir+以上即可退出
+                    //ownerVertex != null
                     break;
                 }
             }
@@ -773,6 +861,7 @@ public class BinarySerializer extends AbstractSerializer {
                 buffer.writeId((Id) value);
             } else if (key == HugeKeys.SORT_VALUES) {
                 assert value instanceof String;
+                //storeValue 以string写入，需要Ending确定数据字节长度
                 buffer.writeStringWithEnding((String) value);
             } else {
                 assert false : key;
@@ -787,26 +876,41 @@ public class BinarySerializer extends AbstractSerializer {
         return null;
     }
 
+    /**
+     * 序列化索引查询
+     * RangeConditionQuery->RangeIndexIdQuery
+     * String/TextConditionQuery->prefixQuery
+     * @param query
+     * @return
+     */
     @Override
     protected Query writeQueryCondition(Query query) {
         HugeType type = query.resultType();
         if (!type.isIndex()) {
             return query;
         }
-
+        //Query.type isIndex
         ConditionQuery cq = (ConditionQuery) query;
-
+        //Convert index query to index id query
         if (type.isNumericIndex()) {
-            // Convert range-index/shard-index query to id range query
+            //索引区间查询-》indexId区间查询
+            // Convert range-index/shard-index query to indexId range query
             return this.writeRangeIndexQuery(cq);
         } else {
             assert type.isSearchIndex() || type.isSecondaryIndex() ||
                    type.isUniqueIndex();
+            //索引等值匹配或模糊匹配（二级索引查询）-》indexId前缀查询
             // Convert secondary-index or search-index query to id query
             return this.writeStringIndexQuery(cq);
         }
     }
 
+    /**
+     * 字符串等值或模糊匹配查询，创建前缀匹配查询prefixQuery
+     * ConditionQuery->(IndexLabel,value)->IndexId->prefixQuery
+     * @param query
+     * @return
+     */
     private Query writeStringIndexQuery(ConditionQuery query) {
         E.checkArgument(query.allSysprop() &&
                         query.conditions().size() == 2,
@@ -824,15 +928,24 @@ public class BinarySerializer extends AbstractSerializer {
         return prefixQuery(query, prefix);
     }
 
+    /**
+     * 索引范围查询,根据condition-》indexId
+     * 根据查询条件中的fields，创建RangeConditions 区间条件对象，
+     * 根据区间条件对象的等值，最大值，最小值等情况，创建条件的IndexId-min/max。
+     * 最后创建最后创建IdRangeQuery(query, start, keyMinEq, max, keyMaxEq)
+     * ConditionQuery->FIELD_VALUES->RangeConditions->min/max/eq->start-indexId/max-indexId->IdRangeQuery
+     * @param query
+     * @return
+     */
     private Query writeRangeIndexQuery(ConditionQuery query) {
-        Id index = query.condition(HugeKeys.INDEX_LABEL_ID);
+        Id index = query.condition(HugeKeys.INDEX_LABEL_ID);    //index label id
         E.checkArgument(index != null, "Please specify the index label");
-
+        //FIELD_VALUES 查询条件 [x,y]
         List<Condition> fields = query.syspropConditions(HugeKeys.FIELD_VALUES);
         E.checkArgument(!fields.isEmpty(),
                         "Please specify the index field values");
 
-        HugeType type = query.resultType();
+        HugeType type = query.resultType(); //type
         Id start = null;
         if (query.paging() && !query.page().isEmpty()) {
             byte[] position = PageState.fromString(query.page()).position();
@@ -840,13 +953,17 @@ public class BinarySerializer extends AbstractSerializer {
         }
 
         RangeConditions range = new RangeConditions(fields);
+        //等值匹配
         if (range.keyEq() != null) {
+            //indexId
             Id id = formatIndexId(type, index, range.keyEq(), true);
             if (start == null) {
+                //等值匹配直接返回IdPrefixQuery(indexId)
                 return new IdPrefixQuery(query, id);
             }
             E.checkArgument(Bytes.compare(start.asBytes(), id.asBytes()) >= 0,
                             "Invalid page out of lower bound");
+            //等值匹配分页查询
             return new IdPrefixQuery(query, start, id);
         }
 
@@ -857,18 +974,19 @@ public class BinarySerializer extends AbstractSerializer {
         if (keyMin == null) {
             E.checkArgument(keyMax != null,
                             "Please specify at least one condition");
+            //根据数据类型返回最小值
             // Set keyMin to min value
             keyMin = NumericUtil.minValueOf(keyMax.getClass());
             keyMinEq = true;
         }
-
+        //indexId-minvalue
         Id min = formatIndexId(type, index, keyMin, false);
-        if (!keyMinEq) {
+        if (!keyMinEq) {    //不包含最小值
             /*
              * Increase 1 to keyMin, index GT query is a scan with GT prefix,
              * inclusiveStart=false will also match index started with keyMin
              */
-            increaseOne(min.asBytes());
+            increaseOne(min.asBytes()); //根据最小单位加1
             keyMinEq = true;
         }
 
@@ -883,32 +1001,52 @@ public class BinarySerializer extends AbstractSerializer {
             keyMax = NumericUtil.maxValueOf(keyMin.getClass());
             keyMaxEq = true;
         }
+        //indexId=maxValue
         Id max = formatIndexId(type, index, keyMax, false);
         if (keyMaxEq) {
             keyMaxEq = false;
             increaseOne(max.asBytes());
         }
+        //keyMinEq=true,keyMaxEq=false,start=min/min=1，max=max/max+1
+        // IdRangeQuery ==> [start,end)
         return new IdRangeQuery(query, start, keyMinEq, max, keyMaxEq);
     }
 
+    /**
+     * format index label deletion
+     * 删除整个index，删除label
+     * BackendEntry(indexType,labelId)
+     * BackendColumn(labelId,null)
+     * @param index
+     * @return
+     */
     private BinaryBackendEntry formatILDeletion(HugeIndex index) {
         Id id = index.indexLabelId();
         BinaryId bid = new BinaryId(id.asBytes(), id);
+        //labelId
         BinaryBackendEntry entry = new BinaryBackendEntry(index.type(), bid);
         if (index.type().isStringIndex()) {
+            //labelId
             byte[] idBytes = IdGenerator.of(id.asString()).asBytes();
             BytesBuffer buffer = BytesBuffer.allocate(idBytes.length);
             buffer.write(idBytes);
+            //labelId
             entry.column(buffer.bytes(), null);
         } else {
             assert index.type().isRangeIndex();
             BytesBuffer buffer = BytesBuffer.allocate(4);
+            //labelId
             buffer.writeInt((int) id.asLong());
             entry.column(buffer.bytes(), null);
         }
         return entry;
     }
 
+    /**
+     * id->EdgeId->BinaryId
+     * @param id
+     * @return
+     */
     private static BinaryId writeEdgeId(Id id) {
         EdgeId edgeId;
         if (id instanceof EdgeId) {
@@ -921,6 +1059,12 @@ public class BinarySerializer extends AbstractSerializer {
         return new BinaryId(buffer.bytes(), id);
     }
 
+    /**
+     * 创建前缀匹配查询
+     * @param query
+     * @param prefix
+     * @return
+     */
     private static Query prefixQuery(ConditionQuery query, Id prefix) {
         Query newQuery;
         if (query.paging() && !query.page().isEmpty()) {
@@ -939,15 +1083,27 @@ public class BinarySerializer extends AbstractSerializer {
         return newQuery;
     }
 
+    /**
+     * 根据查询条件fieldValues，创建IndexId
+     * 如果是等值匹配或Range则写入Ending，结束IndexId
+     * @param type
+     * @param indexLabel
+     * @param fieldValues 查询条件
+     * @param equal 是否等值匹配
+     * @return
+     */
     protected static BinaryId formatIndexId(HugeType type, Id indexLabel,
                                             Object fieldValues,
                                             boolean equal) {
         boolean withEnding = type.isRangeIndex() || equal;
+        //indexId
         Id id = HugeIndex.formatIndexId(type, indexLabel, fieldValues);
         if (!type.isNumericIndex() && indexIdLengthExceedLimit(id)) {
+            //hash
             id = HugeIndex.formatIndexHashId(type, indexLabel, fieldValues);
         }
         BytesBuffer buffer = BytesBuffer.allocate(1 + id.length());
+        //indexId如果是string则写入stringEnding
         byte[] idBytes = buffer.writeIndexId(id, type, withEnding).bytes();
         return new BinaryId(idBytes, id);
     }
@@ -972,15 +1128,22 @@ public class BinarySerializer extends AbstractSerializer {
         return false;
     }
 
+    /**
+     * 字节数组整张最小1bit
+     * 如果最后一个byte 是最大值，则向前进位9like [1, 255] => [2, 0])
+     * @param bytes
+     * @return
+     */
     public static final byte[] increaseOne(byte[] bytes) {
         final byte BYTE_MAX_VALUE = (byte) 0xff;
         assert bytes.length > 0;
         byte last = bytes[bytes.length - 1];
         if (last != BYTE_MAX_VALUE) {
-            bytes[bytes.length - 1] += 0x01;
+            bytes[bytes.length - 1] += 0x01;    //最后1位加1
         } else {
             // Process overflow (like [1, 255] => [2, 0])
             int i = bytes.length - 1;
+            //进位
             for (; i > 0 && bytes[i] == BYTE_MAX_VALUE; --i) {
                 bytes[i] += 0x01;
             }

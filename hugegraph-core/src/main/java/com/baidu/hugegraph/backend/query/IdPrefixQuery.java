@@ -26,18 +26,25 @@ import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.E;
 
 /**
- * 由某个ID开始，并且匹配前缀
+ * 由某个ID开始query，并且匹配前缀
+ * 用于EdgeId查询
  */
 public final class IdPrefixQuery extends Query {
-
-    private final Id start; //开始点
-    private final boolean inclusiveStart;
-    private final Id prefix; //前缀
+    //ownerVertex+dir+labelId+sortValue
+    private final Id start; //开始点，BinaryId
+    private final boolean inclusiveStart;   //是否包含startId
+    //ownerVertex+dir+labelId
+    private final Id prefix; //前缀，BinaryId
 
     public IdPrefixQuery(HugeType resultType, Id prefix) {
         this(resultType, null, prefix, true, prefix);
     }
 
+    /**
+     * 根据一个前缀匹配
+     * @param originQuery
+     * @param prefix
+     */
     public IdPrefixQuery(Query originQuery, Id prefix) {
         this(originQuery.resultType(), originQuery, prefix, true, prefix);
     }
@@ -51,6 +58,14 @@ public final class IdPrefixQuery extends Query {
         this(originQuery.resultType(), originQuery, start, inclusive, prefix);
     }
 
+    /**
+     *
+     * @param resultType 查询结果类型
+     * @param originQuery 父级查询
+     * @param start 查询开始Id
+     * @param inclusive 是否包含start
+     * @param prefix 查询条件，前缀
+     */
     public IdPrefixQuery(HugeType resultType, Query originQuery,
                          Id start, boolean inclusive, Id prefix) {
         super(resultType, originQuery);

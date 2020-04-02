@@ -38,7 +38,7 @@ public class IndexLabel extends SchemaElement {
     private HugeType baseType;
     private Id baseValue;
     private IndexType indexType;
-    private List<Id> indexFields;
+    private List<Id> indexFields;   //索引相关字段
 
     public IndexLabel(final HugeGraph graph, Id id, String name) {
         super(graph, id, name);

@@ -69,6 +69,7 @@ public enum HugeKeys {
 
     /* Column names of data type (Vertex/Edge) */
     LABEL(200, "label"),
+    //使用owner_vertex在查询的时候有意义，使用out与in
     OWNER_VERTEX(201, "owner_vertex"),
     OTHER_VERTEX(202, "other_vertex"),
     PROPERTY_KEY(203, "property_key"),

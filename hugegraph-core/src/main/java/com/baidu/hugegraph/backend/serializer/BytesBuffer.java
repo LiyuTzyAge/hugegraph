@@ -325,6 +325,11 @@ public final class BytesBuffer {
         return bytes;
     }
 
+    /**
+     * Str 编码 UTF-8
+     * @param val
+     * @return
+     */
     public BytesBuffer writeStringRaw(String val) {
         this.write(StringEncoding.encode(val));
         return this;
@@ -757,7 +762,7 @@ public final class BytesBuffer {
     }
 
     /**
-     * 索引id转BytesBuffer
+     * 索引id写入BytesBuffer,根据withEndIng写入结尾
      * @param id
      * @param type
      * @param withEnding 是否写入字符串结尾

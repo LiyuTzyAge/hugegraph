@@ -80,6 +80,11 @@ public class HugeIndex implements GraphType {
         return formatIndexId(type(), this.indexLabelId(), this.fieldValues());
     }
 
+    /**
+     * 当 element id  满足条件（!type.isNumericIndex() && indexIdLengthExceedLimit
+     * (id)），则会创建hashId
+     * @return
+     */
     public Id hashId() {
         return formatIndexHashId(type(), this.indexLabelId(), this.fieldValues());
     }
@@ -195,6 +200,14 @@ public class HugeIndex implements GraphType {
         }
     }
 
+    /**
+     * Index 反序列化
+     * 根据IndexId与IndexType解析Indexlabel、IndexValue
+     * @param graph
+     * @param type
+     * @param id indexId
+     * @return
+     */
     public static HugeIndex parseIndexId(HugeGraph graph, HugeType type,
                                          byte[] id) {
         Object values;
@@ -203,18 +216,20 @@ public class HugeIndex implements GraphType {
             Id idObject = IdGenerator.of(id, IdType.STRING);
             String[] parts = SplicingIdGenerator.parse(idObject);
             E.checkState(parts.length == 2, "Invalid secondary index id");
-            Id label = SchemaElement.schemaId(parts[0]);
+            Id label = SchemaElement.schemaId(parts[0]);    //labelId
             indexLabel = IndexLabel.label(graph, label);
-            values = parts[1];
+            values = parts[1];  //value (正常 or hash)
         } else {
             assert type.isRange4Index() || type.isRange8Index();
             final int labelLength = 4;
             E.checkState(id.length > labelLength, "Invalid range index id");
             BytesBuffer buffer = BytesBuffer.wrap(id);
-            Id label = IdGenerator.of(buffer.readInt());
+            Id label = IdGenerator.of(buffer.readInt());    //labelId
             indexLabel = IndexLabel.label(graph, label);
             List<Id> fields = indexLabel.indexFields();
+            //range index field must one
             E.checkState(fields.size() == 1, "Invalid range index fields");
+            //field 字段类型
             DataType dataType = graph.propertyKey(fields.get(0)).dataType();
             E.checkState(dataType.isNumber() || dataType.isDate(),
                          "Invalid range index field type");
