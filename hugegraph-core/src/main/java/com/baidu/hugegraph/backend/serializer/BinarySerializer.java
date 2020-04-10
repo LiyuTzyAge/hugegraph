@@ -541,10 +541,10 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
-     * 反序列化Vertex与properties
+     * 反序列化Vertex的元数据信息（label，properties）
      *  vertexlabel+size+[property_id+property_value]
      * @param value
-     * @param vertex
+     * @param vertex 当前vertex对象，无元数据信息
      */
     protected void parseVertex(byte[] value, HugeVertex vertex) {
         BytesBuffer buffer = BytesBuffer.wrap(value);
@@ -1129,7 +1129,7 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
-     * 字节数组整张最小1bit
+     * 字节数组增长最小1bit
      * 如果最后一个byte 是最大值，则向前进位9like [1, 255] => [2, 0])
      * @param bytes
      * @return
@@ -1157,12 +1157,23 @@ public class BinarySerializer extends AbstractSerializer {
         return bytes;
     }
 
+    /**
+     * vertexLabel 序列化 BackendEntry(Vertexlabel)
+     * @param vertexLabel
+     * @return
+     */
     @Override
     public BackendEntry writeVertexLabel(VertexLabel vertexLabel) {
         SchemaSerializer serializer = new SchemaSerializer();
         return serializer.writeVertexLabel(vertexLabel);
     }
 
+    /**
+     * vertexLabel 反序列化
+     * @param graph
+     * @param backendEntry
+     * @return
+     */
     @Override
     public VertexLabel readVertexLabel(HugeGraph graph,
                                        BackendEntry backendEntry) {
@@ -1175,6 +1186,11 @@ public class BinarySerializer extends AbstractSerializer {
         return serializer.readVertexLabel(graph, entry);
     }
 
+    /**
+     * EdgeLabel 序列化/反序列化
+     * @param edgeLabel
+     * @return
+     */
     @Override
     public BackendEntry writeEdgeLabel(EdgeLabel edgeLabel) {
         SchemaSerializer serializer = new SchemaSerializer();
@@ -1192,6 +1208,11 @@ public class BinarySerializer extends AbstractSerializer {
         return serializer.readEdgeLabel(graph, entry);
     }
 
+    /**
+     * PropertyKey 序列化
+     * @param propertyKey
+     * @return
+     */
     @Override
     public BackendEntry writePropertyKey(PropertyKey propertyKey) {
         SchemaSerializer serializer = new SchemaSerializer();
@@ -1210,6 +1231,11 @@ public class BinarySerializer extends AbstractSerializer {
         return serializer.readPropertyKey(graph, entry);
     }
 
+    /**
+     * IndexLabel 序列化/反序列化
+     * @param indexLabel
+     * @return
+     */
     @Override
     public BackendEntry writeIndexLabel(IndexLabel indexLabel) {
         SchemaSerializer serializer = new SchemaSerializer();
@@ -1228,10 +1254,22 @@ public class BinarySerializer extends AbstractSerializer {
         return serializer.readIndexLabel(graph, entry);
     }
 
+    /**
+     * schema 序列化工具类，嵌入式（嵌入原对象，简化操作）
+     * 格式：
+     * BackendEntry(Schema.type,Schema.id)
+     * BackendColumn[name=(Megic+SchemId)+Prop.code,value=Ids.num(2bit)+
+     * (Megic+id)*n]
+     */
     private final class SchemaSerializer {
 
         private BinaryBackendEntry entry;
 
+        /**
+         * 序列化VertexLabel，序列化所有属性
+         * @param schema
+         * @return
+         */
         public BinaryBackendEntry writeVertexLabel(VertexLabel schema) {
             this.entry = newBackendEntry(schema);
             writeString(HugeKeys.NAME, schema.name());
@@ -1246,6 +1284,12 @@ public class BinarySerializer extends AbstractSerializer {
             return this.entry;
         }
 
+        /**
+         * vertexLabel 反序列化
+         * @param graph
+         * @param entry
+         * @return
+         */
         public VertexLabel readVertexLabel(HugeGraph graph,
                                            BinaryBackendEntry entry) {
             E.checkNotNull(entry, "entry");
@@ -1266,6 +1310,11 @@ public class BinarySerializer extends AbstractSerializer {
             return vertexLabel;
         }
 
+        /**
+         * EdgeLabel 序列化
+         * @param schema
+         * @return
+         */
         public BinaryBackendEntry writeEdgeLabel(EdgeLabel schema) {
             this.entry = newBackendEntry(schema);
             writeString(HugeKeys.NAME, schema.name());
@@ -1282,6 +1331,12 @@ public class BinarySerializer extends AbstractSerializer {
             return this.entry;
         }
 
+        /**
+         * EdgeLabel 反序列化
+         * @param graph
+         * @param entry
+         * @return
+         */
         public EdgeLabel readEdgeLabel(HugeGraph graph,
                                        BinaryBackendEntry entry) {
             E.checkNotNull(entry, "entry");
@@ -1303,13 +1358,18 @@ public class BinarySerializer extends AbstractSerializer {
             return edgeLabel;
         }
 
+        /**
+         * ProperyKey 序列化/反序列化
+         * @param schema
+         * @return
+         */
         public BinaryBackendEntry writePropertyKey(PropertyKey schema) {
             this.entry = newBackendEntry(schema);
             writeString(HugeKeys.NAME, schema.name());
             writeEnum(HugeKeys.DATA_TYPE, schema.dataType());
             writeEnum(HugeKeys.CARDINALITY, schema.cardinality());
             writeEnum(HugeKeys.AGGREGATE_TYPE, schema.aggregateType());
-            writeIds(HugeKeys.PROPERTIES, schema.properties());
+            writeIds(HugeKeys.PROPERTIES, schema.properties()); //empty
             writeEnum(HugeKeys.STATUS, schema.status());
             writeUserdata(schema);
             return this.entry;
@@ -1334,6 +1394,11 @@ public class BinarySerializer extends AbstractSerializer {
             return propertyKey;
         }
 
+        /**
+         * indexlabel 序列化/反序列化
+         * @param schema
+         * @return
+         */
         public BinaryBackendEntry writeIndexLabel(IndexLabel schema) {
             this.entry = newBackendEntry(schema);
             writeString(HugeKeys.NAME, schema.name());
@@ -1364,7 +1429,12 @@ public class BinarySerializer extends AbstractSerializer {
             return indexLabel;
         }
 
+        /**
+         * UserData 序列化 ：map->json str -> UTF-8
+         * @param schema
+         */
         private void writeUserdata(SchemaElement schema) {
+            //map->json str -> UTF-8
             String userdataStr = JsonUtil.toJson(schema.userdata());
             writeString(HugeKeys.USER_DATA, userdataStr);
         }
@@ -1381,6 +1451,11 @@ public class BinarySerializer extends AbstractSerializer {
             }
         }
 
+        /**
+         * 写入字符串属性 UTF-8
+         * @param key
+         * @param value
+         */
         private void writeString(HugeKeys key, String value) {
             this.entry.column(formatColumnName(key),
                               StringEncoding.encode(value));
@@ -1390,6 +1465,11 @@ public class BinarySerializer extends AbstractSerializer {
             return StringEncoding.decode(column(key));
         }
 
+        /**
+         * 写入Enum ,value=Enum.code
+         * @param key
+         * @param value
+         */
         private void writeEnum(HugeKeys key, SerialEnum value) {
             this.entry.column(formatColumnName(key), new byte[]{value.code()});
         }
@@ -1444,6 +1524,12 @@ public class BinarySerializer extends AbstractSerializer {
             return buffer.readId();
         }
 
+        /**
+         * schema.value包含多个Id，序列化格式：
+         * Ids.num(2bit)+(Megic+id)*n
+         * @param ids
+         * @return
+         */
         private byte[] writeIds(Collection<Id> ids) {
             E.checkState(ids.size() <= BytesBuffer.UINT16_MAX,
                          "The number of properties of vertex/edge label " +
@@ -1452,10 +1538,11 @@ public class BinarySerializer extends AbstractSerializer {
             for (Id id : ids) {
                 size += (1 + id.length());
             }
+            //size = 2+(1+id.length)*n  总长度
             BytesBuffer buffer = BytesBuffer.allocate(size);
-            buffer.writeUInt16(ids.size());
+            buffer.writeUInt16(ids.size()); //2bit id.size
             for (Id id : ids) {
-                buffer.writeId(id);
+                buffer.writeId(id); //Megic+id
             }
             return buffer.bytes();
         }
@@ -1471,6 +1558,11 @@ public class BinarySerializer extends AbstractSerializer {
             return ids;
         }
 
+        /**
+         * 返回Key对应的value
+         * @param key
+         * @return
+         */
         private byte[] column(HugeKeys key) {
             BackendColumn column = this.entry.column(formatColumnName(key));
             E.checkState(column != null, "Not found key '%s' from entry %s",
@@ -1479,8 +1571,16 @@ public class BinarySerializer extends AbstractSerializer {
             return column.value;
         }
 
+        /**
+         * 将Schema的属性Key序列化化为BackendColumn.name的格式
+         * 格式=>(Megic+SchemaId(LongId))+HugeKeys.code
+         * @param key
+         * @return
+         */
         private byte[] formatColumnName(HugeKeys key) {
             Id id = this.entry.id().origin();
+            //1 + id.length()=Megic+id
+            //1 = code
             int size = 1 + id.length() + 1;
             BytesBuffer buffer = BytesBuffer.allocate(size);
             buffer.writeId(id);

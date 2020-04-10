@@ -19,6 +19,10 @@
 
 package com.baidu.hugegraph.backend.store;
 
+/**
+ * 钩子用于获取后端状态信息
+ * @param <Session>
+ */
 public interface MetaHandler<Session extends BackendSession> {
 
     public Object handle(Session session, String meta, Object... args);

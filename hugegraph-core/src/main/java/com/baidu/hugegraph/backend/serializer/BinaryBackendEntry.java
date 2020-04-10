@@ -45,6 +45,7 @@ public class BinaryBackendEntry implements BackendEntry {
     private final HugeType type;
     //vertexId indexId EdgeId ......
     private final BinaryId id;
+    //sub id : property id
     private Id subId;
     private final List<BackendColumn> columns;
 

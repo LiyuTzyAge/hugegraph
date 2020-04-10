@@ -36,6 +36,11 @@ public class BinaryScatterSerializer extends BinarySerializer {
         super(true, true);
     }
 
+    /**
+     * 写入Vertex 改良版本，property作为每一个column写入
+     * @param vertex
+     * @return
+     */
     @Override
     public BackendEntry writeVertex(HugeVertex vertex) {
         BinaryBackendEntry entry = newBackendEntry(vertex);
@@ -55,6 +60,12 @@ public class BinaryScatterSerializer extends BinarySerializer {
         return entry;
     }
 
+    /**
+     * 改良版本vertex 反序列化
+     * @param graph
+     * @param bytesEntry 可能是Edge或Vertex
+     * @return
+     */
     @Override
     public HugeVertex readVertex(HugeGraph graph, BackendEntry bytesEntry) {
         if (bytesEntry == null) {
@@ -82,6 +93,11 @@ public class BinaryScatterSerializer extends BinarySerializer {
         return vertex;
     }
 
+    /**
+     * 写入单个property
+     * @param prop
+     * @return
+     */
     @Override
     public BackendEntry writeVertexProperty(HugeVertexProperty<?> prop) {
         BinaryBackendEntry entry = newBackendEntry(prop.element());

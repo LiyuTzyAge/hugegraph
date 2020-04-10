@@ -21,6 +21,9 @@ package com.baidu.hugegraph.backend.store;
 
 import java.util.Map;
 
+/**
+ * 后端性能指标统一接口
+ */
 public interface BackendMetrics {
 
     public String BACKEND = "backend";

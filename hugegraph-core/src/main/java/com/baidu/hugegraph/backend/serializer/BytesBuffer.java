@@ -398,6 +398,11 @@ public final class BytesBuffer {
         return this.read() & 0x000000ff;    //11111111
     }
 
+    /**
+     * 序列化16bit的数值
+     * @param val
+     * @return
+     */
     public BytesBuffer writeUInt16(int val) {
         assert val <= UINT16_MAX;
         this.writeShort((short) val);

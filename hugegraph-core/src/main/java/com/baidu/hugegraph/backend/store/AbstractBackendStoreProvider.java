@@ -44,6 +44,10 @@ public abstract class AbstractBackendStoreProvider
 
     protected Map<String, BackendStore> stores = null;
 
+    /**
+     * 异步消息通知，并等待结束
+     * @param event
+     */
     protected final void notifyAndWaitEvent(String event) {
         Future<?> future = this.storeEventHub.notify(event, this);
         try {
