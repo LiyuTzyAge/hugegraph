@@ -61,7 +61,7 @@ public abstract class InMemoryDBStore
     private static final Logger LOG = Log.logger(InMemoryDBStore.class);
 
     private final BackendStoreProvider provider;
-
+    //provider map key name
     private final String store;
     private final String database;
 
@@ -78,6 +78,9 @@ public abstract class InMemoryDBStore
         LOG.debug("Store loaded: {}", store);
     }
 
+    /*
+    Tables
+     */
     private void registerMetaHandlers() {
         this.registerMetaHandler("metrics", (session, meta, args) -> {
             InMemoryMetrics metrics = new InMemoryMetrics();
@@ -108,8 +111,17 @@ public abstract class InMemoryDBStore
         return null;
     }
 
+    /*
+    mutate
+     */
+    /**
+     * query->type->table->table.query->Iterator<BackendEntry>
+     * @param query
+     * @return
+     */
     @Override
     public Iterator<BackendEntry> query(Query query) {
+        //query->type->table->table.query
         InMemoryDBTable table = this.table(InMemoryDBTable.tableType(query));
         Iterator<BackendEntry> rs = table.query(null, query);
         LOG.debug("[store {}] has result({}) for query: {}",
@@ -124,6 +136,10 @@ public abstract class InMemoryDBStore
         }
     }
 
+    /**
+     * action->entry->type->table+action.type->具体操作
+     * @param item
+     */
     protected void mutate(BackendAction item) {
         BackendEntry e = item.entry();
         assert e instanceof TextBackendEntry;
@@ -151,7 +167,7 @@ public abstract class InMemoryDBStore
                                            item.action());
         }
     }
-
+    //provider map key name
     @Override
     public String store() {
         return this.store;
@@ -167,6 +183,9 @@ public abstract class InMemoryDBStore
         return this.provider;
     }
 
+    /*
+    manager and ddl
+     */
     @Override
     public void open(HugeConfig config) {
         LOG.debug("Store opened: {}", this.store);

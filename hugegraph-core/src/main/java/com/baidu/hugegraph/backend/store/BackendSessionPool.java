@@ -37,6 +37,7 @@ public abstract class BackendSessionPool {
 
     private final HugeConfig config;
     private final String name;
+    //一个线程一个session
     private final ThreadLocal<BackendSession> threadLocalSession;
     private final AtomicInteger sessionCount;
     private final Map<Long, BackendSession> sessions;

@@ -45,7 +45,7 @@ import com.baidu.hugegraph.util.InsertionOrderUtil;
 
 public class InMemoryDBTable extends BackendTable<BackendSession,
                                                   TextBackendEntry> {
-
+    //底层存储的真实实现
     protected final Map<Id, BackendEntry> store;
 
     public InMemoryDBTable(HugeType type) {

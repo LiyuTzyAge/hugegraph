@@ -40,6 +40,11 @@ public abstract class BackendSession {
         this.updated = this.created;
     }
 
+    /*
+    session state
+    create timestamp
+    updated timestamp
+     */
     public long created() {
         return this.created;
     }

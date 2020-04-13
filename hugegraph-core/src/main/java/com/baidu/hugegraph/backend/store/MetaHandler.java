@@ -20,7 +20,7 @@
 package com.baidu.hugegraph.backend.store;
 
 /**
- * 钩子用于获取后端状态信息
+ * 对元数据查询的构造函数，内嵌session对象用于查询
  * @param <Session>
  */
 public interface MetaHandler<Session extends BackendSession> {

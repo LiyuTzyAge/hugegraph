@@ -38,6 +38,11 @@ public class InMemoryDBStoreProvider extends AbstractBackendStoreProvider {
         return TYPE.equalsIgnoreCase(type);
     }
 
+    /**
+     * get provider
+     * @param graph graph name
+     * @return
+     */
     public static synchronized InMemoryDBStoreProvider instance(String graph) {
         if (providers == null) {
             providers = new ConcurrentHashMap<>();

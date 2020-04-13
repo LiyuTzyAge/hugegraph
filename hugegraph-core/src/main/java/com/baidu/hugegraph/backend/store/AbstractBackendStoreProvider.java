@@ -82,6 +82,10 @@ public abstract class AbstractBackendStoreProvider
         return this.graph;
     }
 
+    /**
+     * 初始化后端
+     * @param graph
+     */
     @Override
     public void open(String graph) {
         LOG.debug("Graph '{}' open StoreProvider", this.graph);

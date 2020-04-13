@@ -64,6 +64,7 @@ public abstract class BackendTable<Session extends BackendSession, Entry> {
 
     /**
      *  Mapping query-type to table-type
+     *  查询类型映射成表类型，因Edge不同方向有两张表
      * @param query origin query
      * @return corresponding table type
      */
@@ -120,7 +121,7 @@ public abstract class BackendTable<Session extends BackendSession, Entry> {
     public static abstract class ShardSpliter<Session extends BackendSession> {
 
         // The min shard size should >= 1M to prevent too many number of shards
-        private static final int MIN_SHARD_SIZE = (int) Bytes.MB;
+        private static final int MIN_SHARD_SIZE = (int) Bytes.MB;   //分片大小
 
         // We assume the size of each key-value is 100 bytes
         private static final int ESTIMATE_BYTES_PER_KV = 100;
@@ -175,8 +176,18 @@ public abstract class BackendTable<Session extends BackendSession, Entry> {
             return NumericUtil.intToBytes(value);
         }
 
+        /**
+         * 估算空间大小
+         * @param session
+         * @return
+         */
         protected abstract long estimateDataSize(Session session);
 
+        /**
+         * 估算Key数量
+         * @param session
+         * @return
+         */
         protected abstract long estimateNumKeys(Session session);
     }
 }
