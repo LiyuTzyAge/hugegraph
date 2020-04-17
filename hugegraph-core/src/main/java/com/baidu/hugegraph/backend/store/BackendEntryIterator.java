@@ -123,6 +123,10 @@ public abstract class BackendEntryIterator implements CIter<BackendEntry> {
         return this.count;
     }
 
+    /**
+     * 返回fetched中的记过数量
+     * @return
+     */
     protected final long fetched() {
         long ccount = this.current == null ? 0 : this.sizeOf(this.current);
         return this.count + ccount;

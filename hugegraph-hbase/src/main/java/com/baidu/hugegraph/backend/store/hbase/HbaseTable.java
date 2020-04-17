@@ -101,9 +101,11 @@ public class HbaseTable extends BackendTable<Session, BackendEntry> {
     @Override
     public void delete(Session session, BackendEntry entry) {
         if (entry.columns().isEmpty()) {
+            //删除行
             session.delete(this.table(), CF, entry.id().asBytes());
         } else {
             for (BackendColumn col : entry.columns()) {
+                //删除某行某列
                 session.remove(table(), CF, entry.id().asBytes(), col.name);
             }
         }
@@ -221,13 +223,21 @@ public class HbaseTable extends BackendTable<Session, BackendEntry> {
         return session.scan(this.table(), start, end);
     }
 
+    /**
+     * 解析hbase查询结果RowIterator
+     * @param rows 查询结果 BackendIterator<Result>
+     * @param query 查询语句
+     * @return
+     */
     protected BackendEntryIterator newEntryIterator(RowIterator rows,
                                                     Query query) {
         return new BinaryEntryIterator<>(rows, query, (entry, row) -> {
             E.checkState(!row.isEmpty(), "Can't parse empty HBase result");
             byte[] id = row.getRow();
+            //entry null 或 row.id 与 entry.id 不匹配
             if (entry == null || !Bytes.prefixWith(id, entry.id().asBytes())) {
                 HugeType type = query.resultType();
+                //返回空结果
                 // NOTE: only support BinaryBackendEntry currently
                 entry = new BinaryBackendEntry(type, id);
             }
@@ -240,6 +250,13 @@ public class HbaseTable extends BackendTable<Session, BackendEntry> {
         });
     }
 
+    /**
+     * 解析Column
+     * @param row
+     * @param entry
+     * @param query
+     * @throws IOException
+     */
     protected void parseRowColumns(Result row, BackendEntry entry, Query query)
                                    throws IOException {
         CellScanner cellScanner = row.cellScanner();

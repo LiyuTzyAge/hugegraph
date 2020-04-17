@@ -118,6 +118,10 @@ public abstract class BackendTable<Session extends BackendSession, Entry> {
 
     /****************************** ShardSpliter ******************************/
 
+    /**
+     * 分片计算器
+     * @param <Session>
+     */
     public static abstract class ShardSpliter<Session extends BackendSession> {
 
         // The min shard size should >= 1M to prevent too many number of shards
@@ -136,24 +140,33 @@ public abstract class BackendTable<Session extends BackendSession, Entry> {
             return this.table;
         }
 
+        /**
+         * 计算分片
+         * @param session
+         * @param splitSize 分片大小
+         * @return
+         */
         public List<Shard> getSplits(Session session, long splitSize) {
             E.checkArgument(splitSize >= MIN_SHARD_SIZE,
                             "The split-size must be >= %s bytes, but got %s",
                             MIN_SHARD_SIZE, splitSize);
-
+            //估算总大小
             long size = this.estimateDataSize(session);
             if (size <= 0) {
                 size = this.estimateNumKeys(session) * ESTIMATE_BYTES_PER_KV;
             }
-
+            //估算分片数量
             double count = Math.ceil(size / (double) splitSize);
             if (count <= 0) {
                 count = 1;
             }
+            //分片token range分配
+            //token 总数 UINT32_MAX
+            //each : 每个shard的长度
             double each = BytesBuffer.UINT32_MAX / count;
 
             long offset = 0L;
-            String last = this.position(offset);
+            String last = this.position(offset);    //上一个offset
             List<Shard> splits = new ArrayList<>((int) count);
             while (offset < BytesBuffer.UINT32_MAX) {
                 offset += each;
@@ -161,6 +174,7 @@ public abstract class BackendTable<Session extends BackendSession, Entry> {
                     offset = BytesBuffer.UINT32_MAX;
                 }
                 String current = this.position(offset);
+                //创建分片
                 splits.add(new Shard(last, current, 0L));
                 last = current;
             }

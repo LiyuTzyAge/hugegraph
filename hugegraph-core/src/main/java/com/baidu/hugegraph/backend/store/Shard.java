@@ -8,6 +8,8 @@ package com.baidu.hugegraph.backend.store;
  * Shard is used for backend storage (like cassandra, hbase) scanning
  * operations. Each shard represents a range of tokens for a node.
  * Reading data from a given shard does not cross multiple nodes.
+ *
+ * 为了范围扫描提供优化，将相邻数据放在同一个node，防止扫描过多nodes
  */
 public class Shard {
 

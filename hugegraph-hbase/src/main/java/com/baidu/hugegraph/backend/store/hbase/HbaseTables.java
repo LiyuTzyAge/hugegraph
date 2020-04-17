@@ -52,6 +52,13 @@ public class HbaseTables {
             super(TABLE);
         }
 
+        /**
+         * 返回counter表中的counter计数器
+         * table schema:type{f{COL{count}}}
+         * @param session
+         * @param type rowkey
+         * @return
+         */
         public long getCounter(Session session, HugeType type) {
             byte[] key = new byte[]{type.code()};
             RowIterator results = session.get(this.table(), CF, key);

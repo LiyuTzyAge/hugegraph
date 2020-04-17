@@ -29,12 +29,20 @@ import com.baidu.hugegraph.backend.store.BackendEntryIterator;
 import com.baidu.hugegraph.util.E;
 
 public class BinaryEntryIterator<Elem> extends BackendEntryIterator {
-
+    //查询结果 Elem 结果类型:hbase=Result,等
     protected final BackendIterator<Elem> results;
+    //解析结果并与上次结果进行合并,因hbase多个column在不同Row中
+    // 函数 BackendEntry：上次结果、Elem 查询记过、BackendEntry 返回结果
     protected final BiFunction<BackendEntry, Elem, BackendEntry> merger;
-
+    //对象缓存，
     protected BackendEntry next;
 
+    /**
+     * 查询结果解析迭代器
+     * @param results 查询结果
+     * @param query 查询语句
+     * @param m 查询结果解析函数
+     */
     public BinaryEntryIterator(BackendIterator<Elem> results, Query query,
                                BiFunction<BackendEntry, Elem, BackendEntry> m) {
         super(query);
@@ -53,11 +61,20 @@ public class BinaryEntryIterator<Elem> extends BackendEntryIterator {
         }
     }
 
+    /**
+     * 关闭资源
+     * @throws Exception
+     */
     @Override
     public void close() throws Exception {
         this.results.close();
     }
 
+    /**
+     * 解析，获取查询结果中的内容，将当前结果写入current，如果存在多个结果，
+     * 下次写入到current中
+     * @return 是否读取到数据
+     */
     @Override
     protected final boolean fetch() {
         assert this.current == null;
@@ -65,32 +82,39 @@ public class BinaryEntryIterator<Elem> extends BackendEntryIterator {
             this.current = this.next;
             this.next = null;
         }
-
+        //遍历结果 直到达到上限INLINE_BATCH_SIZE
         while (this.results.hasNext()) {
             Elem elem = this.results.next();
+            /*
+            解析结果，合并到current中
+             */
             BackendEntry merged = this.merger.apply(this.current, elem);
             E.checkState(merged != null, "Error when merging entry");
             if (this.current == null) {
+                //first ->current=null and next=null
                 // The first time to read
                 this.current = merged;
             } else if (merged == this.current) {
+                //遍历同一对象（RowKey）的不同字段
                 // The next entry belongs to the current entry
                 assert this.current != null;
                 if (this.sizeOf(this.current) >= INLINE_BATCH_SIZE) {
                     break;
                 }
             } else {
+                //如果 遍历过程中，遇到了新的元素，则缓存到next中，break
                 // New entry
                 assert this.next == null;
                 this.next = merged;
                 break;
             }
 
+            //是否到达query中limit的上限
             // When limit exceed, stop fetching
             if (this.reachLimit(this.fetched() - 1)) {
                 // Need remove last one because fetched limit + 1 records
                 this.removeLastRecord();
-                this.results.close();
+                this.results.close();   //结果解析全部完成
                 break;
             }
         }
@@ -98,6 +122,11 @@ public class BinaryEntryIterator<Elem> extends BackendEntryIterator {
         return this.current != null;
     }
 
+    /**
+     * 结果字段数
+     * @param entry
+     * @return
+     */
     @Override
     protected final long sizeOf(BackendEntry entry) {
         /*
@@ -110,6 +139,12 @@ public class BinaryEntryIterator<Elem> extends BackendEntryIterator {
         return 1L;
     }
 
+    /**
+     * 跳过多个column
+     * @param entry
+     * @param skip 字段个数
+     * @return
+     */
     @Override
     protected final long skip(BackendEntry entry, long skip) {
         BinaryBackendEntry e = (BinaryBackendEntry) entry;
@@ -129,6 +164,9 @@ public class BinaryEntryIterator<Elem> extends BackendEntryIterator {
         return new PageState(position, 0, (int) this.count());
     }
 
+    /**
+     * 删除最后一个字段
+     */
     private void removeLastRecord() {
         int lastOne = this.current.columnsSize() - 1;
         ((BinaryBackendEntry) this.current).removeColumn(lastOne);

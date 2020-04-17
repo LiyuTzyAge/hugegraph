@@ -56,10 +56,11 @@ public abstract class HbaseStore extends AbstractBackendStore<Session> {
 
     private static final BackendFeatures FEATURES = new HbaseFeatures();
 
-    private final String store;
-    private final String namespace;
+    private final String store; //key name
+    private final String namespace; //database name= graph name
 
     private final BackendStoreProvider provider;
+    //根据类型映射底层实际的存储表
     private final Map<HugeType, HbaseTable> tables;
 
     private HbaseSessions sessions;
@@ -84,6 +85,11 @@ public abstract class HbaseStore extends AbstractBackendStore<Session> {
         });
     }
 
+    /**
+     * 注册不同类型table
+     * @param type
+     * @param table
+     */
     protected void registerTableManager(HugeType type, HbaseTable table) {
         this.tables.put(type, table);
     }

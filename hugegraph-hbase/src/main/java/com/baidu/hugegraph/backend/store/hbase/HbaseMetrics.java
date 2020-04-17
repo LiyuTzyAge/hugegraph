@@ -44,6 +44,12 @@ public class HbaseMetrics implements BackendMetrics {
         this.hbase = hbase.hbase();
     }
 
+    /**
+     * cluster metrics
+     * cluster_id,average_load,hbase_version,region_count,NODES(region server
+     * count),
+     * @return
+     */
     @Override
     public Map<String, Object> getMetrics() {
         Map<String, Object> results = InsertionOrderUtil.newMap();
@@ -74,6 +80,14 @@ public class HbaseMetrics implements BackendMetrics {
         return results;
     }
 
+    /**
+     * region server metrics:
+     * max_heap_size,used_heap_size,heap_size_unit,request_count,
+     * request_count_per_second,regions
+     * @param serverMetrics
+     * @param regions
+     * @return
+     */
     private static Map<String, Object> formatMetrics(
                                        ServerMetrics serverMetrics,
                                        List<RegionMetrics> regions) {
@@ -90,6 +104,11 @@ public class HbaseMetrics implements BackendMetrics {
         return metrics;
     }
 
+    /**
+     * regions metrics
+     * @param regions
+     * @return
+     */
     private static Map<String, Object> formatMetrics(
                                        List<RegionMetrics> regions) {
         Map<String, Object> metrics = InsertionOrderUtil.newMap();
@@ -99,6 +118,12 @@ public class HbaseMetrics implements BackendMetrics {
         return metrics;
     }
 
+    /**
+     * region metrics:
+     * mem_store_size,file_store_size,store_size_unit
+     * @param region
+     * @return
+     */
     private static Map<String, Object> formatMetrics(RegionMetrics region) {
         Map<String, Object> metrics = InsertionOrderUtil.newMap();
         metrics.put("mem_store_size",

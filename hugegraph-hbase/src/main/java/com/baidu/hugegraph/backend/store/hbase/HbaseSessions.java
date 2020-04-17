@@ -94,10 +94,15 @@ public class HbaseSessions extends BackendSessionPool {
 
     private Table table(String table) throws IOException {
         E.checkState(this.hbase != null, "HBase connection is not opened");
+        //hbase table
         TableName tableName = TableName.valueOf(this.namespace, table);
         return this.hbase.getTable(tableName);
     }
 
+    /**
+     * 建立连接
+     * @throws IOException
+     */
     @Override
     public synchronized void open() throws IOException {
         HugeConfig config = this.config();
@@ -126,6 +131,10 @@ public class HbaseSessions extends BackendSessionPool {
         return this.hbase != null && !this.hbase.isClosed();
     }
 
+    /**
+     * 返回线程相关session
+     * @return
+     */
     @Override
     public final Session session() {
         return (Session) super.getOrNewSession();
@@ -180,6 +189,12 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
+    /**
+     * 创建table，设置column family
+     * @param table
+     * @param cfs
+     * @throws IOException
+     */
     public void createTable(String table, List<byte[]> cfs) throws IOException {
         TableDescriptorBuilder tb = TableDescriptorBuilder.newBuilder(
                                     TableName.valueOf(this.namespace, table));
@@ -192,12 +207,12 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
-    /**
-     * liyu04 adaptive hbase-client 1.2.6
-     * @param table
-     * @param cfs
-     * @throws IOException
-     */
+//    /**
+//     * liyu04 adaptive hbase-client 1.2.6
+//     * @param table
+//     * @param cfs
+//     * @throws IOException
+//     */
 //    public void createTable2(String table, List<byte[]> cfs) throws IOException
 //    {
 //        TableName tn = TableName.valueOf(table);
@@ -222,6 +237,11 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
+    /**
+     * 启用table
+     * @param table
+     * @throws IOException
+     */
     public void enableTable(String table) throws IOException {
         assert this.existsTable(table);
         TableName tableName = TableName.valueOf(this.namespace, table);
@@ -237,6 +257,12 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
+    /**
+     * 异步禁用table
+     * @param table
+     * @return
+     * @throws IOException
+     */
     public Future<Void> disableTableAsync(String table) throws IOException {
         assert this.existsTable(table);
         TableName tableName = TableName.valueOf(this.namespace, table);
@@ -250,6 +276,12 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
+    /**
+     * 异步清空table
+     * @param table
+     * @return
+     * @throws IOException
+     */
     public Future<Void> truncateTableAsync(String table) throws IOException {
         assert this.existsTable(table);
         TableName tableName = TableName.valueOf(this.namespace, table);
@@ -277,6 +309,12 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
+    /**
+     * 查询表空间大小（mem+store)
+     * @param table
+     * @return
+     * @throws IOException
+     */
     public long storeSize(String table) throws IOException {
         long total = 0;
         try (Admin admin = this.hbase.getAdmin()) {
@@ -299,13 +337,18 @@ public class HbaseSessions extends BackendSessionPool {
      * Session for HBase
      */
     public final class Session extends BackendSession {
-
+        //缓存未提交的action。<tablename,List<action>>
         private final Map<String, List<Row>> batch;
 
         public Session() {
             this.batch = new HashMap<>();
         }
 
+        /**
+         * append row to batch
+         * @param table
+         * @param row
+         */
         private void batch(String table, Row row) {
             List<Row> rows = this.batch.get(table);
             if (rows == null) {
@@ -315,6 +358,10 @@ public class HbaseSessions extends BackendSessionPool {
             rows.add(row);
         }
 
+        /**
+         * size of all rows
+         * @return
+         */
         private int batchSize() {
             int size = 0;
             for (List<Row> puts : this.batch.values()) {
@@ -323,6 +370,12 @@ public class HbaseSessions extends BackendSessionPool {
             return size;
         }
 
+        /**
+         * 检查 results 是否存在异常
+         * @param results hbase返回的结果
+         * @param rows 提交的action
+         * @throws Throwable
+         */
         private void checkBatchResults(Object[] results, List<Row> rows)
                                        throws Throwable {
             assert rows.size() == results.length;
@@ -338,6 +391,9 @@ public class HbaseSessions extends BackendSessionPool {
             }
         }
 
+        /**
+         * 仅是session的状态
+         */
         @Override
         public void open() {
             this.opened = true;
@@ -377,6 +433,7 @@ public class HbaseSessions extends BackendSessionPool {
                 List<Row> rows = action.getValue();
                 Object[] results = new Object[rows.size()];
                 try (Table table = table(action.getKey())) {
+                    //执行操作，获取结果
                     table.batch(rows, results);
                     checkBatchResults(results, rows);
                 } catch (Throwable e) {
@@ -414,6 +471,7 @@ public class HbaseSessions extends BackendSessionPool {
 
         /**
          * Add a row record to a table(can be used when adding an index)
+         * put:BackendEntry->Row->batch:Map 将put数据写入缓存中
          */
         public void put(String table, byte[] family,
                         byte[] rowkey, byte[] qualifier, byte[] value) {
@@ -522,6 +580,8 @@ public class HbaseSessions extends BackendSessionPool {
         }
 
         /**
+         * all records
+         *
          * Scan all records from a table
          */
         public RowIterator scan(String table, long limit) {
@@ -534,6 +594,8 @@ public class HbaseSessions extends BackendSessionPool {
         }
 
         /**
+         * prefix
+         *
          * Scan records by rowkey prefix from a table
          */
         public RowIterator scan(String table, byte[] prefix) {
@@ -542,6 +604,8 @@ public class HbaseSessions extends BackendSessionPool {
         }
 
         /**
+         * multi rowkey prefixs
+         *
          * Scan records by multi rowkey prefixs from a table
          */
         public RowIterator scan(String table, Set<byte[]> prefixs) {
@@ -563,6 +627,8 @@ public class HbaseSessions extends BackendSessionPool {
         }
 
         /**
+         * start and prefix
+         *
          * Scan records by rowkey start and prefix from a table
          */
         public RowIterator scan(String table, byte[] startRow,
@@ -574,6 +640,8 @@ public class HbaseSessions extends BackendSessionPool {
         }
 
         /**
+         * range
+         *
          * Scan records by rowkey range from a table
          */
         public RowIterator scan(String table, byte[] startRow, byte[] stopRow) {
@@ -582,6 +650,8 @@ public class HbaseSessions extends BackendSessionPool {
         }
 
         /**
+         * range
+         *
          * Scan records by rowkey range from a table
          */
         public RowIterator scan(String table,
@@ -641,6 +711,7 @@ public class HbaseSessions extends BackendSessionPool {
 
         /**
          * Just for debug
+         * 打印返回结果
          */
         @SuppressWarnings("unused")
         private void dump(String table, Scan scan) throws IOException {
@@ -663,6 +734,9 @@ public class HbaseSessions extends BackendSessionPool {
         }
     }
 
+    /**
+     * 结果迭代器，next将ResultScanner 逐条返回Row
+     */
     protected static class RowIterator implements BackendIterator<Result> {
 
         private final ResultScanner resultScanner;

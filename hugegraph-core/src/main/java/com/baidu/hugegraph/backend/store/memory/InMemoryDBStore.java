@@ -306,6 +306,12 @@ public abstract class InMemoryDBStore
 
     public static class InMemoryGraphStore extends InMemoryDBStore {
 
+        /**
+         * store 注册多个 Table
+         * @param provider
+         * @param database
+         * @param store
+         */
         public InMemoryGraphStore(BackendStoreProvider provider,
                                   String database, String store) {
             super(provider, database, store);
