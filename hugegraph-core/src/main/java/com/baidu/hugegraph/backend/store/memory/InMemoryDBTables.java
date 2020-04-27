@@ -69,6 +69,11 @@ public class InMemoryDBTables {
             super(type);
         }
 
+        /**
+         * 边在写入时 ，store.id = edge.ownerVertex.id
+         * @param session
+         * @param entry
+         */
         @Override
         public void insert(BackendSession session, TextBackendEntry entry) {
             Id id = vertexIdOfEdge(entry);
@@ -223,6 +228,13 @@ public class InMemoryDBTables {
             return rs;
         }
 
+        /**
+         * 返回EdgeId的最前面的内容
+         * 格式：IdGenerator.of(EdgeId.split(id)[0])
+         * @param id
+         * @param entries
+         * @return
+         */
         private BackendEntry getEntryById(Id id,
                                           Map<Id, BackendEntry> entries) {
             // TODO: improve id split

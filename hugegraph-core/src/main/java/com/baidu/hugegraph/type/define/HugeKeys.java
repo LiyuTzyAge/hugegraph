@@ -65,7 +65,7 @@ public enum HugeKeys {
     INDEX_NAME(180, "index_name"),
     FIELD_VALUES(181, "field_values"),
     INDEX_LABEL_ID(182, "index_label_id"),
-    ELEMENT_IDS(183, "element_ids"),
+    ELEMENT_IDS(183, "element_ids"),        //多个ids
 
     /* Column names of data type (Vertex/Edge) */
     LABEL(200, "label"),

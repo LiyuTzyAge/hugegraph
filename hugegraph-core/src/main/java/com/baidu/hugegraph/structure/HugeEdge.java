@@ -340,6 +340,10 @@ public class HugeEdge extends HugeElement implements Edge, Cloneable {
         }
     }
 
+    /**
+     * 翻转
+     * @return
+     */
     public HugeEdge switchOwner() {
         HugeEdge edge = this.clone();
         edge.isOutEdge = !edge.isOutEdge;

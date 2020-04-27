@@ -296,16 +296,32 @@ public class HugeGraph implements GremlinGraph {
         E.checkState(!this.closed, "Graph '%s' has been closed", this);
     }
 
+    /*
+    init graph
+     */
+
+    /**
+     * store = m
+     * @return
+     */
     public BackendStore loadSchemaStore() {
         String name = this.configuration.get(CoreOptions.STORE_SCHEMA);
         return this.storeProvider.loadSchemaStore(name);
     }
 
+    /**
+     * store = g
+     * @return
+     */
     public BackendStore loadGraphStore() {
         String graph = this.configuration.get(CoreOptions.STORE_GRAPH);
         return this.storeProvider.loadGraphStore(graph);
     }
 
+    /**
+     * store = s
+     * @return
+     */
     public BackendStore loadSystemStore() {
         String name = this.configuration.get(CoreOptions.STORE_SYSTEM);
         return this.storeProvider.loadSystemStore(name);

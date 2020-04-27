@@ -93,4 +93,5 @@ public class TextBackendEntryTest extends BaseUnitTest {
         Assert.assertNotEquals(entry4, entry);
         Assert.assertEquals(entry, entry5);
     }
+
 }

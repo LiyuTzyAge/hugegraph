@@ -94,7 +94,7 @@ import com.google.common.collect.ImmutableList;
 public class GraphTransaction extends IndexableTransaction {
 
     public static final int COMMIT_BATCH = (int) Query.COMMIT_BATCH;
-
+    //索引事务
     private final GraphIndexTransaction indexTx;
 
     private Map<Id, HugeVertex> addedVertices;
@@ -116,7 +116,7 @@ public class GraphTransaction extends IndexableTransaction {
     private final boolean checkVertexExist;
     private final int batchSize;
     private final int pageSize;
-
+    //读取配置文件 VERTEX_TX_CAPACITY/EDGE_TX_CAPACITY
     private final int verticesCapacity;
     private final int edgesCapacity;
 
@@ -173,6 +173,7 @@ public class GraphTransaction extends IndexableTransaction {
 
     @Override
     protected void beforeWrite() {
+        //检查tx是否空间足够
         this.checkTxVerticesCapacity();
         this.checkTxEdgesCapacity();
 
@@ -203,6 +204,11 @@ public class GraphTransaction extends IndexableTransaction {
         return new ArrayList<>(this.removedVertices.values());
     }
 
+    /**
+     * edge的sourc与targe是否被删除
+     * @param edge
+     * @return
+     */
     protected final boolean removingEdgeOwner(HugeEdge edge) {
         for (HugeVertex vertex : this.removedVertices.values()) {
             if (edge.belongToVertex(vertex)) {
@@ -234,13 +240,14 @@ public class GraphTransaction extends IndexableTransaction {
 
     protected void prepareAdditions(Map<Id, HugeVertex> addedVertices,
                                     Map<Id, HugeEdge> addedEdges) {
+        //检查相同id的vertex,label不一致的情况，底层与新增数据比较
         if (this.checkVertexExist) {
             this.checkVertexExistIfCustomizedId(addedVertices);
         }
         // Do vertex update
         for (HugeVertex v : addedVertices.values()) {
             assert !v.removed();
-            v.committed();
+            v.committed();  //update state
             this.checkAggregateProperty(v);
             // Check whether passed all non-null properties
             this.checkNonnullProperty(v);
@@ -318,7 +325,7 @@ public class GraphTransaction extends IndexableTransaction {
 
     protected void prepareUpdates(Set<HugeProperty<?>> addedProps,
                                   Set<HugeProperty<?>> removedProps) {
-        for (HugeProperty<?> p : removedProps) {
+        for (HugeProperty<?> p : removedProps) {    //remove
             this.checkAggregateProperty(p);
             if (p.element().type().isVertex()) {
                 HugeVertexProperty<?> prop = (HugeVertexProperty<?>) p;
@@ -440,20 +447,24 @@ public class GraphTransaction extends IndexableTransaction {
         // Override vertices in local `removedVertices`
         this.removedVertices.remove(vertex.id());
         try {
+            //lock vertex label
             this.locksTable.lockReads(LockUtil.VERTEX_LABEL_DELETE,
                                       vertex.schemaLabel().id());
+            //lock index label
             this.locksTable.lockReads(LockUtil.INDEX_LABEL_DELETE,
                                       vertex.schemaLabel().indexLabels());
             // Ensure vertex label still exists from vertex-construct to lock
+            //确认 vertex label 仍然存在
             this.graph().vertexLabel(vertex.schemaLabel().id());
             /*
              * No need to lock VERTEX_LABEL_ADD_UPDATE, because vertex label
              * update only can add nullable properties and user data, which is
              * unconcerned with add vertex
+             * vertex label的修改与添加vertex无关
              */
-            this.beforeWrite();
+            this.beforeWrite(); //check tx capacity
             this.addedVertices.put(vertex.id(), vertex);
-            this.afterWrite();
+            this.afterWrite();  //commit
         } catch (Throwable e){
             this.locksTable.unlock();
             throw e;
@@ -467,8 +478,8 @@ public class GraphTransaction extends IndexableTransaction {
 
         VertexLabel vertexLabel = this.checkVertexLabel(elemKeys.label(),
                                                         verifyVL);
-        Id id = HugeVertex.getIdValue(elemKeys.id());
-        List<Id> keys = this.graph().mapPkName2Id(elemKeys.keys());
+        Id id = HugeVertex.getIdValue(elemKeys.id());   //vertex id
+        List<Id> keys = this.graph().mapPkName2Id(elemKeys.keys()); //property
 
         // Check whether id match with id strategy
         this.checkId(id, keys, vertexLabel);
@@ -483,6 +494,7 @@ public class GraphTransaction extends IndexableTransaction {
         if (this.graph().mode().maintaining() &&
             vertexLabel.idStrategy() == IdStrategy.AUTOMATIC) {
             // Resume id for AUTOMATIC id strategy in restoring mode
+            //maintaining 恢复模式时，强制指定id值
             vertex.assignId(id, true);
         } else {
             vertex.assignId(id);
@@ -1038,6 +1050,10 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 检查底层是否支持AggregateProperty
+     * @param element
+     */
     private void checkAggregateProperty(HugeElement element) {
         E.checkArgument(element.getAggregateProperties().isEmpty() ||
                         this.store().features().supportsAggregateProperty(),
@@ -1045,6 +1061,10 @@ public class GraphTransaction extends IndexableTransaction {
                         this.store().provider().type());
     }
 
+    /**
+     * 检查底层是否支持AggregateProperty
+     * @param property
+     */
     private void checkAggregateProperty(HugeProperty<?> property) {
         E.checkArgument(!property.isAggregateType() ||
                         this.store().features().supportsAggregateProperty(),
@@ -1134,6 +1154,12 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 检查label是否有效，并返回label对象
+     * @param label
+     * @param verifyLabel
+     * @return
+     */
     private VertexLabel checkVertexLabel(Object label, boolean verifyLabel) {
         HugeVertexFeatures features = graph().features().vertex();
 
@@ -1210,6 +1236,10 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 检查是否有属性违反空值约束
+     * @param vertex
+     */
     private void checkNonnullProperty(HugeVertex vertex) {
         Set<Id> keys = vertex.getProperties().keySet();
         VertexLabel vertexLabel = vertex.schemaLabel();
@@ -1229,10 +1259,16 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 检查新增vertices的label与底层数据是否一致，
+     * 如果不一致（如：label.id重复），将抛出异常HugeException
+     * @param vertices
+     */
     private void checkVertexExistIfCustomizedId(Map<Id, HugeVertex> vertices) {
         Set<Id> ids = new HashSet<>();
         for (HugeVertex vertex : vertices.values()) {
             VertexLabel vl = vertex.schemaLabel();
+            //label id 非隐藏命长，策略为自定义
             if (!vl.hidden() && vl.idStrategy().isCustomized()) {
                 ids.add(vertex.id());
             }
@@ -1403,6 +1439,10 @@ public class GraphTransaction extends IndexableTransaction {
         return new ExtendableIterator<V>(txResults.iterator(), backendResults);
     }
 
+    /**
+     * tx 会缓存成vertex
+     * @throws LimitExceedException
+     */
     private void checkTxVerticesCapacity() throws LimitExceedException {
         if (this.verticesInTxSize() >= this.verticesCapacity) {
             throw new LimitExceedException(

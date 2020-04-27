@@ -48,14 +48,16 @@ public abstract class AbstractTransaction implements Transaction {
 
     private boolean autoCommit = false;
     private boolean closed = false;
+    //进入commit后，committing=true
     private boolean committing = false;
+    //准备写入store时，committing2Backend=true
     private boolean committing2Backend = false;
 
     private final HugeGraph graph;
     private final BackendStore store;
-
+    //事务操作
     private BackendMutation mutation;
-
+    //序列化器
     protected final AbstractSerializer serializer;
 
     public AbstractTransaction(HugeGraph graph, BackendStore store) {
@@ -143,7 +145,8 @@ public abstract class AbstractTransaction implements Transaction {
         }
 
         // Do rate limit if needed
-        RateLimiter rateLimiter = this.graph.rateLimiter();
+        //RateLimiter:The max rate(items/s) to add/update/delete vertices/edges
+        RateLimiter rateLimiter = this.graph.rateLimiter(); //限流
         if (rateLimiter != null) {
             int size = this.mutationSize();
             double time = size > 0 ? rateLimiter.acquire(size) : 0.0;
@@ -221,6 +224,7 @@ public abstract class AbstractTransaction implements Transaction {
     }
 
     protected void commit2Backend() {
+        //缓存中对象序列化，生成mutation
         BackendMutation mutation = this.prepareCommit();
         assert !mutation.isEmpty();
         this.commitMutation2Backend(mutation);
@@ -294,6 +298,9 @@ public abstract class AbstractTransaction implements Transaction {
         }
     }
 
+    /**
+     * 必须有事务本身的线程提交
+     */
     protected void checkOwnerThread() {
         if (Thread.currentThread() != this.ownerThread) {
             throw new BackendException("Can't operate a tx in other threads");

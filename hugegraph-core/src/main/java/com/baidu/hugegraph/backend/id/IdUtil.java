@@ -94,7 +94,7 @@ public final class IdUtil {
     }
 
     /**
-     * Id转字符串，添加前缀
+     * Id转字符串，添加前缀 id.type().prefix()
      * @param id
      * @return
      */

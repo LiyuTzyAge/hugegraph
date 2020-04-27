@@ -216,7 +216,7 @@ public abstract class IdGenerator {
 
         @Override
         public int length() {
-            return Long.BYTES;
+            return Long.BYTES;  //long = 8byte
         }
 
         @Override

@@ -286,6 +286,11 @@ public final class LockUtil {
             this.lockReads(group, Arrays.asList(locks));
         }
 
+        /**
+         * 如果id未在group的锁池中，则新增并锁定
+         * @param group
+         * @param locks
+         */
         // NOTE: when used in multi-threads, should add `synchronized`
         public void lockReads(String group, Collection<Id> locks) {
             List<Id> newLocks = new ArrayList<>(locks.size());

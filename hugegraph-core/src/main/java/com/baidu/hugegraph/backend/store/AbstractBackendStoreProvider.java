@@ -153,6 +153,11 @@ public abstract class AbstractBackendStoreProvider
         LOG.debug("Graph '{}' system info has been initialized", this.graph);
     }
 
+    /**
+     * init graph schema
+     * @param name
+     * @return
+     */
     @Override
     public BackendStore loadSchemaStore(final String name) {
         LOG.debug("The '{}' StoreProvider load SchemaStore '{}'",
@@ -169,6 +174,11 @@ public abstract class AbstractBackendStoreProvider
         return store;
     }
 
+    /**
+     * init graph store
+     * @param name g
+     * @return
+     */
     @Override
     public BackendStore loadGraphStore(String name) {
         LOG.debug("The '{}' StoreProvider load GraphStore '{}'",
@@ -185,6 +195,11 @@ public abstract class AbstractBackendStoreProvider
         return store;
     }
 
+    /**
+     * init system store
+     * @param name s
+     * @return
+     */
     @Override
     public BackendStore loadSystemStore(String name) {
         return this.loadGraphStore(name);

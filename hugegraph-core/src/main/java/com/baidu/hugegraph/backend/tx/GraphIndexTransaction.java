@@ -138,6 +138,11 @@ public class GraphIndexTransaction extends AbstractTransaction {
         }
     }
 
+    /**
+     * 更新vertex index
+     * @param vertex
+     * @param removed
+     */
     @Watched(prefix = "index")
     public void updateVertexIndex(HugeVertex vertex, boolean removed) {
         // Update index(only property, no edge) of a vertex

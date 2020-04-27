@@ -104,14 +104,29 @@ public class TextSerializer extends AbstractSerializer {
         return this.formatSyspropName(col.string());
     }
 
+    /**
+     * 格式： HugeType.PROPERTY>key
+     * @param key
+     * @return
+     */
     private String formatPropertyName(String key) {
         return SplicingIdGenerator.concat(writeType(HugeType.PROPERTY), key);
     }
 
+    /**
+     * 格式： HugeType.PROPERTY>propertykey.id
+     * @param prop
+     * @return
+     */
     private String formatPropertyName(HugeProperty<?> prop) {
         return this.formatPropertyName(writeId(prop.propertyKey().id()));
     }
 
+    /**
+     * 格式：value.toString
+     * @param prop
+     * @return
+     */
     private String formatPropertyValue(HugeProperty<?> prop) {
         // May be a single value or a list of values
         return JsonUtil.toJson(prop.value());
@@ -121,6 +136,12 @@ public class TextSerializer extends AbstractSerializer {
         return HugeType.PROPERTY.string();
     }
 
+    /**
+     * 序列化多个 properties
+     * 格式：key1 VALUE_SPLITOR value1 VALUE_SPLITOR key2 VALUE_SPLITOR value2
+     * @param vertex
+     * @return
+     */
     private String formatPropertyValues(HugeVertex vertex) {
         int size = vertex.getProperties().size();
         StringBuilder sb = new StringBuilder(64 * size);
@@ -137,6 +158,14 @@ public class TextSerializer extends AbstractSerializer {
         return sb.toString();
     }
 
+    /**
+     * 解析 user property 数据，写入到owner中
+     * colName 以SplicingIdGenerator方式存储 : HugeType>Property.id
+     * colValue 以json格式保存数据 : json string
+     * @param colName
+     * @param colValue
+     * @param owner
+     */
     private void parseProperty(String colName, String colValue,
                                HugeElement owner) {
         String[] colParts = SplicingIdGenerator.split(colName);
@@ -163,6 +192,12 @@ public class TextSerializer extends AbstractSerializer {
         }
     }
 
+    /**
+     * 解析多个property ，以连续方式写入的properties格式，分隔符 VALUE_SPLITOR,
+     * 格式：key1 VALUE_SPLITOR value1 VALUE_SPLITOR key2 VALUE_SPLITOR value2
+     * @param colValue
+     * @param vertex
+     */
     private void parseProperties(String colValue, HugeVertex vertex) {
         if (colValue == null || colValue.isEmpty()) {
             return;
@@ -179,11 +214,23 @@ public class TextSerializer extends AbstractSerializer {
         }
     }
 
+    /**
+     * type >edge-label-name > sortKeys > targetVertex
+     * @param edge
+     * @return
+     */
     private String formatEdgeName(HugeEdge edge) {
         // Edge name: type + edge-label-name + sortKeys + targetVertex
         return writeEdgeId(edge.idWithDirection(), false);
     }
 
+    /**
+     * edge 多个property保存到一起
+     * 格式
+     * key1 VALUE_SPLITOR value1 VALUE_SPLITOR key2 VALUE_SPLITOR value2
+     * @param edge
+     * @return
+     */
     private String formatEdgeValue(HugeEdge edge) {
         StringBuilder sb = new StringBuilder(256 * edge.getProperties().size());
         // Edge id
@@ -246,6 +293,12 @@ public class TextSerializer extends AbstractSerializer {
         }
     }
 
+    /**
+     * parse column 包含（PROPERTY,EDGE_OUT,EDGE_IN,SYS_PROPERTY）
+     * @param colName
+     * @param colValue
+     * @param vertex
+     */
     private void parseColumn(String colName, String colValue,
                              HugeVertex vertex) {
         // Column name
@@ -270,6 +323,14 @@ public class TextSerializer extends AbstractSerializer {
         }
     }
 
+    /**
+     * 格式
+     * entry.id = vertex.id
+     * column: HugeKeys.LABEL , labelId
+     * column: HugeType.PROPERTY ,key1 VALUE_SPLITOR value1 VALUE_SPLITOR key2 VALUE_SPLITOR value2
+     * @param vertex
+     * @return
+     */
     @Override
     public BackendEntry writeVertex(HugeVertex vertex) {
         TextBackendEntry entry = newBackendEntry(vertex);
@@ -291,6 +352,12 @@ public class TextSerializer extends AbstractSerializer {
         throw new NotImplementedException("Unsupported writeVertexProperty()");
     }
 
+    /**
+     * 反序列化vertex
+     * @param graph
+     * @param backendEntry
+     * @return
+     */
     @Override
     public HugeVertex readVertex(HugeGraph graph, BackendEntry backendEntry) {
         E.checkNotNull(graph, "serializer graph");
@@ -317,6 +384,15 @@ public class TextSerializer extends AbstractSerializer {
         return vertex;
     }
 
+    /**
+     * 格式：
+     * entry.id = edge.idWithDirection.id
+     * column:
+     * type>edge-label-name>sortKeys>targetVertex ,
+     * key1 VALUE_SPLITOR value1 VALUE_SPLITOR key2 VALUE_SPLITOR value2
+     * @param edge
+     * @return
+     */
     @Override
     public BackendEntry writeEdge(HugeEdge edge) {
         Id id = IdGenerator.of(edge.idWithDirection().asString());
@@ -325,6 +401,11 @@ public class TextSerializer extends AbstractSerializer {
         return entry;
     }
 
+    /**
+     * 写入单个property
+     * @param prop
+     * @return
+     */
     @Override
     public BackendEntry writeEdgeProperty(HugeEdgeProperty<?> prop) {
         HugeEdge edge = prop.element();
@@ -342,6 +423,16 @@ public class TextSerializer extends AbstractSerializer {
         throw new NotImplementedException("Unsupported readEdge()");
     }
 
+    /**
+     * 格式：
+     * entry.id = index.id
+     * column: HugeKeys.INDEX_LABEL_ID, label.id 或
+     * column: HugeKeys.FIELD_VALUES, fieldValues="asdfsadf"
+     * column: HugeKeys.INDEX_LABEL_ID, indexLabelId
+     * column: HugeKeys.ELEMENT_IDS, elementIds={[1,2,3]}
+     * @param index
+     * @return
+     */
     @Override
     public BackendEntry writeIndex(HugeIndex index) {
         TextBackendEntry entry = newBackendEntry(index.type(), index.id());
@@ -521,6 +612,11 @@ public class TextSerializer extends AbstractSerializer {
         return result;
     }
 
+    /*
+     元数据序列化
+     schema serical
+     vertexlabel、Edgelabel、property、indexLabel
+     */
     @Override
     public BackendEntry writeVertexLabel(VertexLabel vertexLabel) {
         TextBackendEntry entry = newBackendEntry(vertexLabel);
@@ -722,6 +818,16 @@ public class TextSerializer extends AbstractSerializer {
         return indexLabel;
     }
 
+    /**
+     * EdgeId 序列化格式
+     * withOwnerVertex：
+     * Llongid>direct> edge-label-name > sortKeys > targetVerte
+     * no withOwnerVertex: direct> edge-label-name > sortKeys > targetVerte
+     *
+     * @param id
+     * @param withOwnerVertex
+     * @return
+     */
     private String writeEdgeId(Id id, boolean withOwnerVertex) {
         EdgeId edgeId;
         if (id instanceof EdgeId) {
@@ -746,6 +852,11 @@ public class TextSerializer extends AbstractSerializer {
         return type.string();
     }
 
+    /**
+     * "" + id.type().prefix() + id.asObject()
+     * @param id
+     * @return
+     */
     private static String writeEntryId(Id id) {
         return IdUtil.writeString(id);
     }
@@ -754,6 +865,11 @@ public class TextSerializer extends AbstractSerializer {
         return IdUtil.readString(id);
     }
 
+    /**
+     * 以json的格式写入id
+     * @param id
+     * @return
+     */
     private static String writeId(Id id) {
         if (id.number()) {
             return JsonUtil.toJson(id.asLong());
@@ -776,6 +892,12 @@ public class TextSerializer extends AbstractSerializer {
         return readId(id.asString());
     }
 
+    /**
+     * json 格式多个id的字符串形式
+     * {[1,2,3]}
+     * @param ids
+     * @return
+     */
     private static String writeIds(Collection<Id> ids) {
         Object[] array = new Object[ids.size()];
         int i = 0;

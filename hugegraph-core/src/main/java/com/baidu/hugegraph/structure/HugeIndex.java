@@ -165,6 +165,7 @@ public class HugeIndex implements GraphType {
     }
 
     /**
+     * index数据序列化
      * 创建IndexID ,将schemaId 与value组合
      * String:  "schemaId:value(str)" ==>StringId
      * Range:   "schemaId(int) value(number)"  =>BinaryId
@@ -188,7 +189,7 @@ public class HugeIndex implements GraphType {
             assert type.isRangeIndex();
             int length = type.isRange4Index() ? 4 : 8;
             BytesBuffer buffer = BytesBuffer.allocate(4 + length);
-            buffer.writeInt(SchemaElement.schemaId(indexLabel));
+            buffer.writeInt(SchemaElement.schemaId(indexLabel)); //schemaId
             if (fieldValues != null) {
                 E.checkState(fieldValues instanceof Number,
                              "Field value of range index must be number:" +

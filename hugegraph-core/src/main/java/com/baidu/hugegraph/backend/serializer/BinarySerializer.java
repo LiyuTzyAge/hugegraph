@@ -647,7 +647,7 @@ public class BinarySerializer extends AbstractSerializer {
              */
             entry = this.formatILDeletion(index);
         } else {
-            Id id = index.id(); //BackendEntry id
+            Id id = index.id(); //index label id
             HugeType type = index.type(); //BackendEntry type
             byte[] value = null;
             if (!type.isNumericIndex() && indexIdLengthExceedLimit(id)) {
@@ -1084,6 +1084,7 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
+     * 数据index序列化
      * 根据查询条件fieldValues，创建IndexId
      * 如果是等值匹配或Range则写入Ending，结束IndexId
      * @param type

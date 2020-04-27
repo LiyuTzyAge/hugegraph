@@ -34,6 +34,7 @@ import com.baidu.hugegraph.schema.PropertyKey;
 import com.baidu.hugegraph.type.HugeType;
 import com.baidu.hugegraph.type.define.Cardinality;
 import com.baidu.hugegraph.type.define.DataType;
+import com.baidu.hugegraph.type.define.HugeKeys;
 import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.E;
 import com.baidu.hugegraph.util.KryoUtil;
@@ -652,7 +653,9 @@ public final class BytesBuffer {
                 break;
             default:
                 //字符串写入流程 : 写入长度,数据
-                // 数据结构：id长度[0x80+len/0x80+len(high)_len(low)]+实际数据[id.bytes]
+                // 数据结构：id长度+实际数据[id.bytes]
+                // short Id:[writeUInt8(len | 0x80)]+实际数据[id.bytes]
+                // long Id::[len(high)_len(low)]+实际数据[id.bytes]
                 // String Id
                 bytes = id.asBytes();
                 int len = bytes.length;
@@ -663,8 +666,8 @@ public final class BytesBuffer {
                     E.checkArgument(len <= ID_LEN_MAX,   //(0x7f + 1)=0x80=128
                                     "Id max length is %s, but got %s {%s}",
                                     ID_LEN_MAX, len, id);
-                    //id [1,128]
-                    len -= 1; // mapping [1, 128] to [0, 127]
+                    // 源 [1, 128] to 目标 [0, 127] 不与补码冲突
+                    len -= 1;
                     /*
                     0x80=128 , len [0,127]
                     len | 0x80 、len < 0x80 --> 0x80<=结果<=255
@@ -905,6 +908,15 @@ public final class BytesBuffer {
             this.writeUInt8(0x70 | positive);   //0111 1000/0111 0000
             this.writeLong(val);
         }
+    }
+
+    /**
+     * just for test
+     * @param val
+     */
+    public void writeNumberTest(long val)
+    {
+        writeNumber(val);
     }
 
     /**

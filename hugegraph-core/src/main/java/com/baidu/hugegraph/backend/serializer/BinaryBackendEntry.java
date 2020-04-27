@@ -175,7 +175,7 @@ public class BinaryBackendEntry implements BackendEntry {
      * 二进制ID
      * 用于与底层交互，所有的ID都要转换成BinaryId
      */
-    protected static final class BinaryId implements Id {
+    public static final class BinaryId implements Id {
 
         private final byte[] bytes;
         private final Id id;
