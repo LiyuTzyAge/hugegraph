@@ -42,6 +42,9 @@ import com.baidu.hugegraph.type.HugeType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
+/**
+ * Lock 管理工具
+ */
 public final class LockUtil {
 
     private static final Logger LOG = Log.logger(LockUtil.class);
@@ -63,6 +66,7 @@ public final class LockUtil {
     public static final long WRITE_WAIT_TIMEOUT = 30L;
 
     public static void init(String graph) {
+        //lock name = graphName + INDEX_LABEL_DELETE
         LockManager.instance().create(join(graph, INDEX_LABEL_DELETE));
         LockManager.instance().create(join(graph, EDGE_LABEL_DELETE));
         LockManager.instance().create(join(graph, VERTEX_LABEL_DELETE));

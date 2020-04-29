@@ -65,6 +65,7 @@ public class TaskManager {
         E.checkArgumentNotNull(graph, "The graph can't be null");
         ExecutorService task = this.taskExecutor;
         ExecutorService db = this.dbExecutor;
+        //每个图分配固定大小的线程(task,db)
         this.schedulers.put(graph, new TaskScheduler(graph, task, db));
     }
 

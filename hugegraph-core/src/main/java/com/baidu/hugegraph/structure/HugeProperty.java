@@ -50,6 +50,10 @@ public abstract class HugeProperty<V> implements Property<V>, GraphType {
         return this.pkey;
     }
 
+    /**
+     * property id
+     * @return
+     */
     public Object id() {
         return SplicingIdGenerator.concat(this.owner.id().asString(),
                                           this.key());

@@ -83,11 +83,14 @@ public class HugeGraph implements GremlinGraph {
 
     static {
         TraversalStrategies strategies = null;
+        //TinkerPop Graph strategies
         strategies = TraversalStrategies.GlobalCache
                                         .getStrategies(Graph.class)
                                         .clone();
+        //hugegraph graph strategies
         strategies.addStrategies(HugeVertexStepStrategy.instance(),
                                  HugeGraphStepStrategy.instance());
+        //register strategies
         TraversalStrategies.GlobalCache.registerStrategies(HugeGraph.class,
                                                            strategies);
 
@@ -134,7 +137,7 @@ public class HugeGraph implements GremlinGraph {
         this.name = configuration.get(CoreOptions.STORE);
         this.closed = false;
         this.mode = GraphMode.NONE;
-
+        //初始化LockGroup
         LockUtil.init(this.name);
 
         try {
@@ -147,7 +150,7 @@ public class HugeGraph implements GremlinGraph {
         }
 
         this.tx = new TinkerpopTransaction(this);
-
+        //注册graph的线程资源包含store,task
         this.taskManager.addScheduler(this);
 
         this.variables = null;
@@ -198,6 +201,9 @@ public class HugeGraph implements GremlinGraph {
         return this.rateLimiter;
     }
 
+    /**
+     * 初始化store，不同store映射不同的tables
+     */
     @Override
     public void initBackend() {
         this.loadSchemaStore().open(this.configuration);
@@ -215,6 +221,9 @@ public class HugeGraph implements GremlinGraph {
         LOG.info("Graph '{}' has been initialized", this.name);
     }
 
+    /**
+     * 清理并管理store
+     */
     @Override
     public void clearBackend() {
         this.waitUntilAllTasksCompleted();
@@ -243,6 +252,9 @@ public class HugeGraph implements GremlinGraph {
         LOG.info("Graph '{}' has been truncated", this.name);
     }
 
+    /**
+     * 等待task直到timeout
+     */
     private void waitUntilAllTasksCompleted() {
         long timeout = this.configuration.get(CoreOptions.TASK_WAIT_TIMEOUT);
         try {
@@ -376,6 +388,10 @@ public class HugeGraph implements GremlinGraph {
         return serializer;
     }
 
+    /**
+     * 全文索引分析器
+     * @return
+     */
     public Analyzer analyzer() {
         String name = this.configuration.get(CoreOptions.TEXT_ANALYZER);
         String mode = this.configuration.get(CoreOptions.TEXT_ANALYZER_MODE);
@@ -439,6 +455,11 @@ public class HugeGraph implements GremlinGraph {
         return this.graphTransaction().queryEdges(query);
     }
 
+    /**
+     * 边相邻点
+     * @param edges
+     * @return
+     */
     public Iterator<Vertex> adjacentVertices(Iterator<Edge> edges) {
         return this.graphTransaction().queryAdjacentVertices(edges);
     }
@@ -556,6 +577,11 @@ public class HugeGraph implements GremlinGraph {
         return StringFactory.graphString(this, this.name());
     }
 
+    /**
+     * 将property id 映射为name
+     * @param ids
+     * @return
+     */
     public List<String> mapPkId2Name(Collection<Id> ids) {
         List<String> names = new ArrayList<>(ids.size());
         for (Id id : ids) {

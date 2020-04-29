@@ -39,6 +39,10 @@ public class HugeVertexProperty<V> extends HugeProperty<V>
         super(owner, key, value);
     }
 
+    /**
+     * 与HugeEdgeProperty不同
+     * @return
+     */
     @Override
     public HugeType type() {
         return this.pkey.aggregateType().isNone() ?

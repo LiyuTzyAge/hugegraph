@@ -147,6 +147,11 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
         this.assignId(id, false);
     }
 
+    /**
+     * 根据输入内容，格式化id，生成类型明确的id
+     * @param id
+     * @param force
+     */
     @Watched(prefix = "vertex")
     public void assignId(Id id, boolean force) {
         IdStrategy strategy = this.label.idStrategy();
@@ -201,6 +206,11 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
         this.label = label;
     }
 
+    /**
+     * 返回主键的属性值
+     * 可多个属性
+     * @return
+     */
     @Watched(prefix = "vertex")
     public List<Object> primaryValues() {
         E.checkArgument(this.label.idStrategy() == IdStrategy.PRIMARY_KEY,
@@ -256,7 +266,7 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
         if (elemKeys.id() != null) {
             throw Edge.Exceptions.userSuppliedIdsNotSupported();
         }
-        Id id = HugeElement.getIdValue(elemKeys.id());
+        Id id = HugeElement.getIdValue(elemKeys.id());  //edge id = null
 
         // Check target vertex
         E.checkArgumentNotNull(vertex, "Target vertex can't be null");
@@ -367,7 +377,7 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
     public Iterator<Edge> edges(Direction tinkerpopDir, String... edgeLabels) {
         Directions direction = Directions.convert(tinkerpopDir);
         // NOTE: get edges from memory if load all edges when loading vertex.
-        if (this.existsEdges()) {
+        if (this.existsEdges()) {   //first use memory
             return this.getEdges(direction, edgeLabels);
         }
 

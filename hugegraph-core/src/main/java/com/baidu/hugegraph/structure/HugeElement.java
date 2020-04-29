@@ -62,7 +62,7 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
     protected Id id;
     protected Map<Id, HugeProperty<?>> properties;
     protected boolean removed;
-    protected boolean fresh;
+    protected boolean fresh;    //是否被提交
     protected boolean propLoaded;
 
     public HugeElement(final HugeGraph graph, Id id) {
@@ -270,6 +270,11 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
 
     public abstract Object sysprop(HugeKeys key);
 
+    /**
+     * id().equals(other.id())
+     * @param obj
+     * @return
+     */
     @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof Element)) {
@@ -284,6 +289,10 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
         return this.id().equals(other.id());
     }
 
+    /**
+     * element.id().hashCode()
+     * @return
+     */
     @Override
     public int hashCode() {
         E.checkState(this.id() != null, "Element id can't be null");
@@ -292,6 +301,7 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
 
     /**
      * Classify parameter list(pairs) from call request
+     * 解析参数
      * @param keyValues The property key-value pair of the vertex or edge
      * @return          Key-value pairs that are classified and processed
      */
@@ -325,6 +335,12 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
         return elemKeys;
     }
 
+    /**
+     * 返回Element的 id
+     * @param type
+     * @param idValue
+     * @return
+     */
     public static final Id getIdValue(HugeType type, Object idValue) {
         assert type.isGraph();
         Id id = getIdValue(idValue);
@@ -388,6 +404,7 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
 
         private Object label = null;
         private Object id = null;
+        //property key
         private Set<String> keys = new HashSet<>();
 
         public Object label() {

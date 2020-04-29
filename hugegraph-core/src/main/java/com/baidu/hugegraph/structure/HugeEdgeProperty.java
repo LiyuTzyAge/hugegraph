@@ -33,6 +33,10 @@ public class HugeEdgeProperty<V> extends HugeProperty<V> {
         super(owner, key, value);
     }
 
+    /**
+     * 与HugeVertexProperty 不同
+     * @return
+     */
     @Override
     public HugeType type() {
         return this.pkey.aggregateType().isNone() ?
@@ -63,6 +67,10 @@ public class HugeEdgeProperty<V> extends HugeProperty<V> {
         return ElementHelper.areEqual(this, obj);
     }
 
+    /**
+     * 边转向 后的属性对象
+     * @return
+     */
     public HugeEdgeProperty<V> switchEdgeOwner() {
         assert this.owner instanceof HugeEdge;
         return new HugeEdgeProperty<V>(((HugeEdge) this.owner).switchOwner(),

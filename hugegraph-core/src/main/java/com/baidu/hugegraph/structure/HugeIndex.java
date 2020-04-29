@@ -62,6 +62,10 @@ public class HugeIndex implements GraphType {
         return this.indexLabel.name();
     }
 
+    /**
+     * 多种索引类型
+     * @return
+     */
     @Override
     public HugeType type() {
         if (this.indexLabel == IndexLabel.label(HugeType.VERTEX)) {

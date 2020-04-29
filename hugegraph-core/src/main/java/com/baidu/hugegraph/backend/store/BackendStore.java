@@ -28,6 +28,9 @@ import com.baidu.hugegraph.config.HugeConfig;
 import com.baidu.hugegraph.type.HugeType;
 import com.baidu.hugegraph.util.E;
 
+/**
+ * 存储后端映射，每种store映射不同的tables
+ */
 public interface BackendStore {
 
     // Store name

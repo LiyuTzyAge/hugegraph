@@ -119,6 +119,10 @@ public class HugeEdge extends HugeElement implements Edge, Cloneable {
         return this.label.name();
     }
 
+    /**
+     * 是否自循环
+     * @return
+     */
     public boolean selfLoop() {
         return this.sourceVertex != null &&
                this.sourceVertex == this.targetVertex;
@@ -162,14 +166,20 @@ public class HugeEdge extends HugeElement implements Edge, Cloneable {
         return ((EdgeId) this.id).directed(true);
     }
 
+    /**
+     * 返回sortKey列表
+     * @return
+     */
     @Watched(prefix = "edge")
     public List<Object> sortValues() {
+        //返回所有sortKeys
         List<Id> sortKeys = this.schemaLabel().sortKeys();
         if (sortKeys.isEmpty()) {
             return ImmutableList.of();
         }
         List<Object> propValues = new ArrayList<>(sortKeys.size());
         for (Id sk : sortKeys) {
+            //sort keys 属于 element的属性
             HugeProperty<?> property = this.getProperty(sk);
             E.checkState(property != null,
                          "The value of sort key '%s' can't be null", sk);

@@ -155,6 +155,7 @@ public abstract class AbstractBackendStoreProvider
 
     /**
      * init graph schema
+     * 不同的store映射不同的tables
      * @param name
      * @return
      */

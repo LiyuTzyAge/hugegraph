@@ -35,6 +35,7 @@ import com.baidu.hugegraph.config.HugeConfig;
 public class HugeFeatures implements Graph.Features {
 
     protected final HugeGraph graph;
+    //持久性
     protected final boolean supportsPersistence;
     protected final HugeGraphFeatures graphFeatures;
     protected final HugeVertexFeatures vertexFeatures;
