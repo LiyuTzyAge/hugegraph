@@ -235,6 +235,11 @@ public class Query implements Cloneable {
         return this.limit() == NO_LIMIT;
     }
 
+    /**
+     * 是否到达查询上限
+     * @param count
+     * @return
+     */
     public boolean reachLimit(long count) {
         long limit = this.limit();
         if (limit == NO_LIMIT) {

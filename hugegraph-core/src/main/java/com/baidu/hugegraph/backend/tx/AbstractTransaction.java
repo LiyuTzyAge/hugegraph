@@ -43,19 +43,19 @@ import com.google.common.util.concurrent.RateLimiter;
 public abstract class AbstractTransaction implements Transaction {
 
     protected static final Logger LOG = Log.logger(Transaction.class);
-
+    //事务线程
     private final Thread ownerThread = Thread.currentThread();
-
+    //事务状态
     private boolean autoCommit = false;
     private boolean closed = false;
-    //进入commit后，committing=true
+    //进入commit后，committing=true，写入底层后committing=false
     private boolean committing = false;
     //准备写入store时，committing2Backend=true
     private boolean committing2Backend = false;
-
+    //底层
     private final HugeGraph graph;
     private final BackendStore store;
-    //事务操作
+    //事务操作，事务级别的
     private BackendMutation mutation;
     //序列化器
     protected final AbstractSerializer serializer;
@@ -79,7 +79,7 @@ public abstract class AbstractTransaction implements Transaction {
     }
 
     public BackendStore store() {
-        E.checkNotNull(this.graph, "store");
+        E.checkNotNull(this.store, "store");
         return this.store;
     }
 
@@ -87,6 +87,11 @@ public abstract class AbstractTransaction implements Transaction {
         return this.store().metadata(type, meta, args);
     }
 
+    /**
+     * 执行查询，底层原始查询，为优化
+     * @param query
+     * @return
+     */
     @Watched(prefix = "tx")
     public QueryResults query(Query query) {
         LOG.debug("Transaction query: {}", query);
@@ -166,6 +171,11 @@ public abstract class AbstractTransaction implements Transaction {
         }
     }
 
+    /**
+     * 操作个数如果达到size则提交
+     * @param size
+     * @throws BackendException
+     */
     @Override
     public void commitIfGtSize(int size) throws BackendException {
         if (this.mutationSize() >= size) {
@@ -215,6 +225,9 @@ public abstract class AbstractTransaction implements Transaction {
         this.autoCommit = autoCommit;
     }
 
+    /**
+     * 刷新mutation
+     */
     protected void reset() {
         this.mutation = new BackendMutation();
     }
@@ -234,6 +247,10 @@ public abstract class AbstractTransaction implements Transaction {
         assert mutations.length > 0;
         this.committing2Backend = true;
 
+        /*
+        hbase and memory do nothing
+        cassandra and mysql do init session
+         */
         // If an exception occurred, catch in the upper layer and rollback
         this.store.beginTx();
         for (BackendMutation mutation : mutations) {
@@ -255,12 +272,14 @@ public abstract class AbstractTransaction implements Transaction {
     }
 
     protected void afterWrite() {
+        //如果自动提交，则先提交
         if (this.autoCommit()) {
             this.commitOrRollback();
         }
     }
 
     protected void beforeRead() {
+        //如果自动提交，则先提交
         if (this.autoCommit() && this.hasUpdates()) {
             this.commitOrRollback();
         }

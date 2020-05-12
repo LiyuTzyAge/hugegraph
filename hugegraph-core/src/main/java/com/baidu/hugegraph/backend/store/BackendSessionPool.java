@@ -37,10 +37,11 @@ public abstract class BackendSessionPool {
 
     private final HugeConfig config;
     private final String name;
-    //一个线程一个session
+    //一个线程一个session，连接池结构
+    // threadLocalSession+sessionCount+sessions
     private final ThreadLocal<BackendSession> threadLocalSession;
     private final AtomicInteger sessionCount;
-    private final Map<Long, BackendSession> sessions;
+    private final Map<Long, BackendSession> sessions; //什么作用??
 
     public BackendSessionPool(HugeConfig config, String name) {
         this.config = config;
@@ -54,6 +55,10 @@ public abstract class BackendSessionPool {
         return this.config;
     }
 
+    /**
+     * 重新创建或get当前线程的session
+     * @return
+     */
     public final BackendSession getOrNewSession() {
         BackendSession session = this.threadLocalSession.get();
         if (session == null) {
@@ -82,6 +87,11 @@ public abstract class BackendSessionPool {
         return session;
     }
 
+    /**
+     * 检测session，如果session更新时间超过CONNECTION_DETECT_INTERVAL，
+     * 则会reconnect
+     * @param session
+     */
     private void detectSession(BackendSession session) {
         // Reconnect if the session idle time exceed specified value
         long interval = this.config.get(CoreOptions.CONNECTION_DETECT_INTERVAL);

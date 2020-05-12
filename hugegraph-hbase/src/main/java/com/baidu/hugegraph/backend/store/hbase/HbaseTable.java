@@ -111,12 +111,22 @@ public class HbaseTable extends BackendTable<Session, BackendEntry> {
         }
     }
 
+    /**
+     * 写入某一个column
+     * @param session
+     * @param entry
+     */
     @Override
     public void append(Session session, BackendEntry entry) {
         assert entry.columns().size() == 1;
         this.insert(session, entry);
     }
 
+    /**
+     * 删除某一个column
+     * @param session
+     * @param entry
+     */
     @Override
     public void eliminate(Session session, BackendEntry entry) {
         assert entry.columns().size() == 1;

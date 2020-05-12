@@ -21,6 +21,10 @@ package com.baidu.hugegraph.backend.store;
 
 import com.baidu.hugegraph.type.define.Action;
 
+/**
+ * 事务写操作数据对象
+ * 包含：动作action与数据entry
+ */
 public class BackendAction {
 
     private final Action action;

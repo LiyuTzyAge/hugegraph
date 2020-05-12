@@ -52,8 +52,10 @@ public class BackendMutation {
         Id id = entry.id();
         assert id != null;
         if (this.updates.containsKey(entry.type(), id)) {
+            //更新操作动作
             this.optimizeUpdates(entry, action);
         } else {
+            //新增操作
             // If there is no entity with this id, add it
             this.updates.put(entry.type(), id, BackendAction.of(action, entry));
         }
@@ -74,24 +76,28 @@ public class BackendMutation {
         assert id != null;
         final List<BackendAction> items = this.updates.get(entry.type(), id);
         assert items != null;
+        //是否忽略当前操作
         boolean ignoreCurrent = false;
         for (Iterator<BackendAction> iter = items.iterator(); iter.hasNext();) {
             BackendAction originItem = iter.next();
             Action originAction = originItem.action();
             switch (action) {
-                case INSERT:
+                case INSERT: //(2)
+                    //写入之前的所有操作都可忽略
                     iter.remove();
                     break;
-                case DELETE:
+                case DELETE: //(1)
+                    //先insert在delete 被认为不相容的操作 ？？？
                     if (originAction == Action.INSERT) {
                         throw incompatibleActionException(action, originAction);
                     } else if (originAction == Action.DELETE) {
-                        ignoreCurrent = true;
+                        ignoreCurrent = true; //忽略当前操作
                     } else {
-                        iter.remove();
+                        iter.remove();  //删除之前的操作
                     }
                     break;
                 case APPEND:
+                    //违反唯一性约束，写入相同值
                     if (entry.type().isUniqueIndex() &&
                         originAction == Action.APPEND) {
                         throw new IllegalArgumentException(String.format(
@@ -99,11 +105,13 @@ public class BackendMutation {
                                   " transaction between %s and %s",
                                   entry, originItem.entry()));
                     }
-                case ELIMINATE:
+                case ELIMINATE: //（3）
+                    //insert与delete与eliminate不相容
                     if (originAction == Action.INSERT ||
                         originAction == Action.DELETE) {
                         throw incompatibleActionException(action, originAction);
                     } else {
+                        //如果清除对象的subid相同则可忽略之前的操作
                         Id subId = entry.subId();
                         Id originSubId = originItem.entry().subId();
                         assert subId != null;
@@ -117,6 +125,7 @@ public class BackendMutation {
                               "Unknown mutate action: %s", action));
             }
         }
+        //未忽略当前操作
         if (!ignoreCurrent) {
             items.add(BackendAction.of(action, entry));
         }
@@ -224,6 +233,12 @@ public class BackendMutation {
             this.mutations = InsertionOrderUtil.newMap();
         }
 
+        /**
+         * 缓存操作对象
+         * @param type Entry.type
+         * @param id Entry.id
+         * @param mutation Entry BackendAction
+         */
         public void put(HugeType type, Id id, BackendAction mutation) {
             Map<Id, List<BackendAction>> table = this.mutations.get(type);
             if (table == null) {
@@ -240,6 +255,12 @@ public class BackendMutation {
             items.add(mutation);
         }
 
+        /**
+         * 是否包含这一类对象
+         * @param type
+         * @param id
+         * @return
+         */
         public boolean containsKey(HugeType type, Id id) {
             Map<Id, List<BackendAction>> table = this.mutations.get(type);
             return table != null && table.containsKey(id);
@@ -276,6 +297,10 @@ public class BackendMutation {
             return rs;
         }
 
+        /**
+         * 所有BackendActio数量
+         * @return
+         */
         public int size() {
             int size = 0;
             for (Map<Id, List<BackendAction>> m : this.mutations.values()) {

@@ -433,7 +433,7 @@ public class HbaseSessions extends BackendSessionPool {
                 List<Row> rows = action.getValue();
                 Object[] results = new Object[rows.size()];
                 try (Table table = table(action.getKey())) {
-                    //执行操作，获取结果
+                    //批量执行操作，获取结果
                     table.batch(rows, results);
                     checkBatchResults(results, rows);
                 } catch (Throwable e) {
@@ -459,6 +459,10 @@ public class HbaseSessions extends BackendSessionPool {
 
         /**
          * Add a row record to a table
+         * @param table table name
+         * @param family col family
+         * @param rowkey rowkey
+         * @param columns columns
          */
         public void put(String table, byte[] family, byte[] rowkey,
                         Collection<BackendColumn> columns) {
@@ -482,6 +486,7 @@ public class HbaseSessions extends BackendSessionPool {
 
         /**
          * Delete a record by rowkey and qualifier from a table
+         * qualifier = colname
          */
         public void remove(String table, byte[] family,
                            byte[] rowkey, byte[] qualifier) {

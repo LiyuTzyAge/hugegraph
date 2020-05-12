@@ -30,6 +30,10 @@ public abstract class IndexableTransaction extends AbstractTransaction {
         super(graph, store);
     }
 
+    /**
+     * 判断index transaction中是否有为提交项
+     * @return
+     */
     @Override
     public boolean hasUpdates() {
         AbstractTransaction indexTx = this.indexTransaction();
@@ -48,9 +52,14 @@ public abstract class IndexableTransaction extends AbstractTransaction {
         }
     }
 
+    /**
+     * 提交graph/schema + index 事务
+     */
     @Override
     protected void commit2Backend() {
+        //graph/schema updates
         BackendMutation mutation = this.prepareCommit();
+        //index updates
         BackendMutation txMutation = this.indexTransaction().prepareCommit();
         assert !mutation.isEmpty() || !txMutation.isEmpty();
         // Commit graph/schema updates and index updates with graph/schema tx
@@ -66,6 +75,10 @@ public abstract class IndexableTransaction extends AbstractTransaction {
         }
     }
 
+    /**
+     * rollback graph/schema + index 事务
+     * @throws BackendException
+     */
     @Override
     public void rollback() throws BackendException {
         try {
@@ -84,5 +97,10 @@ public abstract class IndexableTransaction extends AbstractTransaction {
         }
     }
 
+    /**
+     * 创建index transaction
+     * index transaction 内嵌在graph/schema 事务中
+     * @return
+     */
     protected abstract AbstractTransaction indexTransaction();
 }

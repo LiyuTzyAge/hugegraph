@@ -133,6 +133,10 @@ public class SchemaTransaction extends IndexableTransaction {
         return this.getSchema(HugeType.PROPERTY_KEY, name);
     }
 
+    /**
+     * 删除PropertyKey，如果vertexLabel或edgeLabel有在使用，则异常NotAllowException
+     * @param id
+     */
     @Watched(prefix = "schema")
     public void removePropertyKey(Id id) {
         LOG.debug("SchemaTransaction remove property key '{}'", id);
@@ -261,6 +265,11 @@ public class SchemaTransaction extends IndexableTransaction {
                         callable, dependencies);
     }
 
+    /**
+     * 跟新schema状态，通过覆盖实现
+     * @param schema
+     * @param status
+     */
     @Watched(prefix = "schema")
     public void updateSchemaStatus(SchemaElement schema, SchemaStatus status) {
         schema.status(status);
@@ -395,10 +404,18 @@ public class SchemaTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * get next schema id
+     * @param type
+     * @param id
+     * @param name
+     * @return
+     */
     @Watched(prefix = "schema")
     public Id validOrGenerateId(HugeType type, Id id, String name) {
         boolean forSystem = Graph.Hidden.isHidden(name);
         if (id != null) {
+            //使用当前id，并更新系统表
             this.checkIdAndUpdateNextId(type, id, name, forSystem);
         } else {
             if (forSystem) {
@@ -429,12 +446,22 @@ public class SchemaTransaction extends IndexableTransaction {
         this.setNextIdLowest(type, id.asLong());
     }
 
+    /**
+     * get next schema id for user property
+     * @param type
+     * @return
+     */
     @Watched(prefix = "schema")
     public Id getNextId(HugeType type) {
         LOG.debug("SchemaTransaction get next id for {}", type);
         return this.store().nextId(type);
     }
 
+    /**
+     * 设置下一个id的最低值
+     * @param type
+     * @param lowest
+     */
     @Watched(prefix = "schema")
     public void setNextIdLowest(HugeType type, long lowest) {
         LOG.debug("SchemaTransaction set next id to {} for {}", lowest, type);
@@ -448,6 +475,11 @@ public class SchemaTransaction extends IndexableTransaction {
         return IdGenerator.of(-id.asLong());
     }
 
+    /**
+     * Restoring 模式中，检查id是否存在
+     * @param type
+     * @param id
+     */
     @Watched(prefix = "schema")
     public void checkIdIfRestoringMode(HugeType type, Id id) {
         if (this.graph().mode() == GraphMode.RESTORING) {
@@ -460,18 +492,39 @@ public class SchemaTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * schema userdata 设置创建时间
+     * @param schema
+     */
     private static void setCreateTimeIfNeeded(SchemaElement schema) {
         if (!schema.userdata().containsKey(Userdata.CREATE_TIME)) {
             schema.userdata(Userdata.CREATE_TIME, DateUtil.now());
         }
     }
 
+    /**
+     * 异步操作 用于 schema写操作
+     * @param graph
+     * @param schemaType
+     * @param schemaId
+     * @param callable
+     * @return
+     */
     private static Id asyncRun(HugeGraph graph, HugeType schemaType,
                                Id schemaId, SchemaCallable callable) {
         return asyncRun(graph, schemaType, schemaId,
                         callable, ImmutableSet.of());
     }
 
+    /**
+     * 异步操作 用于 schema写操作
+     * @param graph
+     * @param schemaType
+     * @param schemaId
+     * @param callable
+     * @param dependencies
+     * @return
+     */
     @Watched(prefix = "schema")
     private static Id asyncRun(HugeGraph graph, HugeType schemaType,
                                Id schemaId, SchemaCallable callable,

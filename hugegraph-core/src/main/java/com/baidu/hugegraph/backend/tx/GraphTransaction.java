@@ -97,6 +97,7 @@ public class GraphTransaction extends IndexableTransaction {
     //索引事务
     private final GraphIndexTransaction indexTx;
 
+    //事务写数据缓存
     private Map<Id, HugeVertex> addedVertices;
     private Map<Id, HugeVertex> removedVertices;
 
@@ -111,12 +112,16 @@ public class GraphTransaction extends IndexableTransaction {
     private Map<Id, HugeEdge> updatedEdges;
     private Set<HugeProperty<?>> updatedOldestProps; // Oldest props
 
+    //事务锁,粒度图级别--》graph name
     private LockUtil.LocksTable locksTable;
-
+    //配置文件
+    //vertex.check_customized_id_exist
     private final boolean checkVertexExist;
+    //QUERY_BATCH_SIZE
     private final int batchSize;
+    //QUERY_PAGE_SIZE
     private final int pageSize;
-    //读取配置文件 VERTEX_TX_CAPACITY/EDGE_TX_CAPACITY
+    //事务缓存容量 VERTEX_TX_CAPACITY/EDGE_TX_CAPACITY
     private final int verticesCapacity;
     private final int edgesCapacity;
 
@@ -140,6 +145,7 @@ public class GraphTransaction extends IndexableTransaction {
 
     @Override
     public boolean hasUpdates() {
+        //数据待提交数量+索引待提交数量
         return this.mutationSize() > 0 || super.hasUpdates();
     }
 
@@ -148,6 +154,9 @@ public class GraphTransaction extends IndexableTransaction {
         return this.verticesInTxSize() + this.edgesInTxSize();
     }
 
+    /**
+     * 重置缓存
+     */
     @Override
     protected void reset() {
         super.reset();
@@ -185,13 +194,17 @@ public class GraphTransaction extends IndexableTransaction {
                this.removedVertices.size() +
                this.updatedVertices.size();
     }
-
+    //相关的所有事务操作数量
     protected final int edgesInTxSize() {
         return this.addedEdges.size() +
                this.removedEdges.size() +
                this.updatedEdges.size();
     }
 
+    /**
+     * append 写入缓存
+     * @return
+     */
     protected final Collection<HugeVertex> verticesInTxUpdated() {
         int size = this.addedVertices.size() + this.updatedVertices.size();
         List<HugeVertex> vertices = new ArrayList<>(size);
@@ -200,6 +213,10 @@ public class GraphTransaction extends IndexableTransaction {
         return vertices;
     }
 
+    /**
+     * remove 删除缓存
+     * @return
+     */
     protected final Collection<HugeVertex> verticesInTxRemoved() {
         return new ArrayList<>(this.removedVertices.values());
     }
@@ -210,6 +227,7 @@ public class GraphTransaction extends IndexableTransaction {
      * @return
      */
     protected final boolean removingEdgeOwner(HugeEdge edge) {
+        //为什么遍历所有的vertex，而不是用edge的vertex到removedVertices中搜索
         for (HugeVertex vertex : this.removedVertices.values()) {
             if (edge.belongToVertex(vertex)) {
                 return true;
@@ -218,6 +236,11 @@ public class GraphTransaction extends IndexableTransaction {
         return false;
     }
 
+    /**
+     * commit 准备
+     * 将缓存数据转换成 BackendMutation
+     * @return
+     */
     @Watched(prefix = "tx")
     @Override
     protected BackendMutation prepareCommit() {
@@ -241,6 +264,7 @@ public class GraphTransaction extends IndexableTransaction {
     protected void prepareAdditions(Map<Id, HugeVertex> addedVertices,
                                     Map<Id, HugeEdge> addedEdges) {
         //检查相同id的vertex,label不一致的情况，底层与新增数据比较
+        //自定义id场景
         if (this.checkVertexExist) {
             this.checkVertexExistIfCustomizedId(addedVertices);
         }
@@ -277,6 +301,11 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 准备删除vertex和edge数据
+     * @param removedVertices vertexId:HugeVertex
+     * @param removedEdges edgeId:HugeEdge
+     */
     protected void prepareDeletions(Map<Id, HugeVertex> removedVertices,
                                     Map<Id, HugeEdge> removedEdges) {
         // Remove related edges of each vertex
@@ -298,6 +327,7 @@ public class GraphTransaction extends IndexableTransaction {
 
         // Remove vertices
         for (HugeVertex v : removedVertices.values()) {
+            //检查聚合属性是否兼容
             this.checkAggregateProperty(v);
             /*
              * If the backend stores vertex together with edges, it's edges
@@ -323,25 +353,36 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * supportsUpdateVertexProperty=true、supportsUpdateEdgeProperty=true
+     * 则element只包含单个propery即可并执行单个更新，否则需要先查出所有属性才能实现覆盖更新
+     * @param addedProps
+     * @param removedProps
+     */
     protected void prepareUpdates(Set<HugeProperty<?>> addedProps,
                                   Set<HugeProperty<?>> removedProps) {
         for (HugeProperty<?> p : removedProps) {    //remove
             this.checkAggregateProperty(p);
+            //vertex property
             if (p.element().type().isVertex()) {
                 HugeVertexProperty<?> prop = (HugeVertexProperty<?>) p;
                 if (this.store().features().supportsUpdateVertexProperty()) {
+                    //更新单个属性
                     // Update vertex index without removed property
                     this.indexTx.updateVertexIndex(prop.element(), false);
-                    // Eliminate the property(OUT and IN owner edge)
+                    // eliminate the property of vertex
+                    //删除单个属性
                     this.doEliminate(this.serializer.writeVertexProperty(prop));
                 } else {
-                    // Override vertex
+                    // Override vertex:覆盖写入vertex所有的属性，因为多个属性是
+                    // 存储在一起的(先查再写的过程)
                     this.addVertex(prop.element());
                 }
             } else {
                 assert p.element().type().isEdge();
                 HugeEdgeProperty<?> prop = (HugeEdgeProperty<?>) p;
                 if (this.store().features().supportsUpdateEdgeProperty()) {
+                    //更新单个属性
                     // Update edge index without removed property
                     this.indexTx.updateEdgeIndex(prop.element(), false);
                     // Eliminate the property(OUT and IN owner edge)
@@ -350,6 +391,7 @@ public class GraphTransaction extends IndexableTransaction {
                                      prop.switchEdgeOwner()));
                 } else {
                     // Override edge(it will be in addedEdges & updatedEdges)
+                    //覆盖edge的所有属性值(先查再写的过程)
                     this.addEdge(prop.element());
                 }
             }
@@ -364,7 +406,7 @@ public class GraphTransaction extends IndexableTransaction {
                     // Append new property(OUT and IN owner edge)
                     this.doAppend(this.serializer.writeVertexProperty(prop));
                 } else {
-                    // Override vertex
+                    // Override vertex ;element包含所有的属性值
                     this.addVertex(prop.element());
                 }
             } else {
@@ -472,6 +514,12 @@ public class GraphTransaction extends IndexableTransaction {
         return vertex;
     }
 
+    /**
+     * 解析参数
+     * @param verifyVL
+     * @param keyValues
+     * @return
+     */
     @Watched(prefix = "graph")
     public HugeVertex constructVertex(boolean verifyVL, Object... keyValues) {
         HugeElement.ElementKeys elemKeys = HugeElement.classifyKeys(keyValues);
@@ -518,6 +566,15 @@ public class GraphTransaction extends IndexableTransaction {
         this.afterWrite();
     }
 
+    /*
+        图查询
+     */
+
+    /**
+     * 查询相邻的顶点
+     * @param edges
+     * @return
+     */
     public Iterator<Vertex> queryAdjacentVertices(Iterator<Edge> edges) {
         return new BatchMapperIterator<>(this.batchSize, edges, batchEdges -> {
             List<Id> vertexIds = new ArrayList<>();
@@ -1002,6 +1059,12 @@ public class GraphTransaction extends IndexableTransaction {
         return query;
     }
 
+    /**
+     * ??????
+     * @param query
+     * @param graph
+     * @return
+     */
     public static boolean matchEdgeSortKeys(ConditionQuery query,
                                             HugeGraph graph) {
         assert query.resultType().isEdge();
@@ -1072,6 +1135,11 @@ public class GraphTransaction extends IndexableTransaction {
                         this.store().provider().type());
     }
 
+    /**
+     * 优化查询
+     * @param query
+     * @return
+     */
     private Query optimizeQuery(ConditionQuery query) {
         Id label = (Id) query.condition(HugeKeys.LABEL);
 
@@ -1140,6 +1208,11 @@ public class GraphTransaction extends IndexableTransaction {
         return null;
     }
 
+    /**
+     * 索引查询
+     * @param query
+     * @return
+     */
     private IdHolderList indexQuery(ConditionQuery query) {
         /*
          * Optimize by index-query
@@ -1187,6 +1260,12 @@ public class GraphTransaction extends IndexableTransaction {
         return (VertexLabel) label;
     }
 
+    /**
+     * Check whether id match with id strategy
+     * @param id vertex id
+     * @param keys primary key ids
+     * @param vertexLabel
+     */
     private void checkId(Id id, List<Id> keys, VertexLabel vertexLabel) {
         // Check whether id match with id strategy
         IdStrategy strategy = vertexLabel.idStrategy();
@@ -1260,8 +1339,9 @@ public class GraphTransaction extends IndexableTransaction {
     }
 
     /**
-     * 检查新增vertices的label与底层数据是否一致，
-     * 如果不一致（如：label.id重复），将抛出异常HugeException
+     * 自定义vertex.id情况
+     * 检查新增vertices的label与底层数据是否一致，一致代表，执行数据覆盖
+     * 如果不一致，将抛出异常HugeException，数据不一致
      * @param vertices
      */
     private void checkVertexExistIfCustomizedId(Map<Id, HugeVertex> vertices) {
@@ -1282,6 +1362,7 @@ public class GraphTransaction extends IndexableTransaction {
             if (!results.hasNext()) {
                 return;
             }
+            //只检查第一个
             HugeVertex existedVertex = results.next();
             HugeVertex newVertex = vertices.get(existedVertex.id());
             if (!existedVertex.label().equals(newVertex.label())) {
@@ -1297,6 +1378,12 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 根据prop.id 锁定schema label与index label ，执行callback
+     * @param schemaLabel
+     * @param prop
+     * @param callback
+     */
     private void lockForUpdateProperty(SchemaLabel schemaLabel,
                                        HugeProperty<?> prop,
                                        Runnable callback) {
@@ -1313,6 +1400,7 @@ public class GraphTransaction extends IndexableTransaction {
                        LockUtil.VERTEX_LABEL_DELETE :
                        LockUtil.EDGE_LABEL_DELETE;
         try {
+            //lock schema label
             this.locksTable.lockReads(group, schemaLabel.id());
             this.locksTable.lockReads(LockUtil.INDEX_LABEL_DELETE, indexIds);
             // Ensure schema label still exists
@@ -1336,6 +1424,12 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 计算查询query与HugeElement是否匹配，用于执行条件过滤
+     * @param query
+     * @param elem
+     * @return
+     */
     private boolean filterResultFromIndexQuery(Query query, HugeElement elem) {
         if (!(query instanceof ConditionQuery)) {
             return true;
@@ -1357,6 +1451,12 @@ public class GraphTransaction extends IndexableTransaction {
         return false;
     }
 
+    /**
+     * 将顶点查询结果与缓存合并，并返回最新结果集
+     * @param query
+     * @param vertices 顶点查询结果
+     * @return
+     */
     private Iterator<?> joinTxVertices(Query query,
                                        Iterator<HugeVertex> vertices) {
         assert query.resultType().isVertex();
@@ -1366,6 +1466,13 @@ public class GraphTransaction extends IndexableTransaction {
                                   this.updatedVertices);
     }
 
+    /**
+     * 将边查询结果与缓存进行合并，返回最新结果集
+     * @param query
+     * @param edges 边查询结果
+     * @param removingVertices 删除的顶点
+     * @return
+     */
     private Iterator<?> joinTxEdges(Query query, Iterator<HugeEdge> edges,
                                     Map<Id, HugeVertex> removingVertices) {
         assert query.resultType().isEdge();
@@ -1390,6 +1497,17 @@ public class GraphTransaction extends IndexableTransaction {
         });
     }
 
+    /**
+     * 将底层结果数据集与缓存中变更的数据集合并，返回缓存中最新的数据集与底层数据集
+     * @param query 查询
+     * @param records 底层查询结果数据集
+     * @param match 条件查询计算条件
+     * @param addedTxRecords  缓存
+     * @param removedTxRecords 缓存
+     * @param updatedTxRecords 缓存
+     * @param <V>
+     * @return
+     */
     private <V extends HugeElement> Iterator<V> joinTxRecords(
                                     Query query,
                                     Iterator<V> records,
@@ -1399,6 +1517,7 @@ public class GraphTransaction extends IndexableTransaction {
                                     Map<Id, V> updatedTxRecords) {
         this.checkOwnerThread();
         // Return the origin results if there is no change in tx
+        //如果缓存中没有变更直接返回底层数据集
         if (addedTxRecords.isEmpty() &&
             removedTxRecords.isEmpty() &&
             updatedTxRecords.isEmpty()) {
@@ -1411,6 +1530,7 @@ public class GraphTransaction extends IndexableTransaction {
          * Collect added/updated records
          * Records in memory have higher priority than query from backend store
          */
+        //过滤出缓存中存在的数据集
         for (V elem : addedTxRecords.values()) {
             if (query.reachLimit(txResults.size())) {
                 break;
@@ -1429,13 +1549,14 @@ public class GraphTransaction extends IndexableTransaction {
         }
 
         // Filter backend record if it's updated in memory
+        //backendResults（底层数据集）等于 records中有，缓存中没有的数据集
         Iterator<V> backendResults = new FilterIterator<>(records, elem -> {
             Id id = elem.id();
             return !addedTxRecords.containsKey(id) &&
                    !updatedTxRecords.containsKey(id) &&
                    !removedTxRecords.containsKey(id);
         });
-
+        //合并txResults（缓存数据集）与 backendResults（底层数据集）
         return new ExtendableIterator<V>(txResults.iterator(), backendResults);
     }
 
@@ -1459,6 +1580,12 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 更新property
+     * @param element
+     * @param property
+     * @param oldProperty
+     */
     private void propertyUpdated(HugeElement element, HugeProperty<?> property,
                                  HugeProperty<?> oldProperty) {
         if (element.type().isVertex()) {
@@ -1497,6 +1624,10 @@ public class GraphTransaction extends IndexableTransaction {
         this.afterWrite();
     }
 
+    /**
+     * 根据vertexLabel 删除顶点
+     * @param vertexLabel
+     */
     public void removeVertices(VertexLabel vertexLabel) {
         if (this.hasUpdates()) {
             throw new BackendException("There are still changes to commit");
@@ -1520,6 +1651,10 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * remove edges by label
+     * @param edgeLabel
+     */
     public void removeEdges(EdgeLabel edgeLabel) {
         if (this.hasUpdates()) {
             throw new BackendException("There are still changes to commit");
@@ -1562,6 +1697,14 @@ public class GraphTransaction extends IndexableTransaction {
         this.traverseByLabel(label, this::queryEdges, consumer, deleting);
     }
 
+    /**
+     * 根据 label 遍历 element
+     * @param label
+     * @param fetcher 查询执行器，返回遍历结果
+     * @param consumer 消费查询结果，会执行写操作，并会被自动提交
+     * @param deleting
+     * @param <T>
+     */
     private <T> void traverseByLabel(SchemaLabel label,
                                      Function<Query, Iterator<T>> fetcher,
                                      Consumer<T> consumer, boolean deleting) {

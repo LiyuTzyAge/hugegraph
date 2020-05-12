@@ -92,10 +92,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 public class GraphIndexTransaction extends AbstractTransaction {
-
+    //empty 符号
     private static final String INDEX_EMPTY_SYM = "\u0000";
+    //null 符号
     private static final String INDEX_NULL_SYM = "\u0001";
-
+    //数据分词器
     private final Analyzer textAnalyzer;
 
     public GraphIndexTransaction(HugeGraph graph, BackendStore store) {
@@ -288,12 +289,26 @@ public class GraphIndexTransaction extends AbstractTransaction {
         }
     }
 
+    /**
+     * 是否唯一值
+     * @param indexLabel
+     * @param value
+     * @param id
+     * @return
+     */
     private boolean existUniqueValue(IndexLabel indexLabel,
                                      Object value, Id id) {
         return !this.hasEliminateInTx(indexLabel, value, id) &&
                this.existUniqueValueInStore(indexLabel, value);
     }
 
+    /**
+     * 事务中是否存在
+     * @param indexLabel
+     * @param value
+     * @param elementId
+     * @return
+     */
     private boolean hasEliminateInTx(IndexLabel indexLabel, Object value,
                                      Id elementId) {
         HugeIndex index = new HugeIndex(indexLabel);
@@ -303,6 +318,12 @@ public class GraphIndexTransaction extends AbstractTransaction {
         return this.mutation().contains(entry, Action.ELIMINATE);
     }
 
+    /**
+     * 存储中是否存在
+     * @param indexLabel
+     * @param value
+     * @return
+     */
     private boolean existUniqueValueInStore(IndexLabel indexLabel,
                                             Object value) {
         ConditionQuery query = new ConditionQuery(HugeType.UNIQUE_INDEX);
@@ -461,6 +482,12 @@ public class GraphIndexTransaction extends AbstractTransaction {
         return holders;
     }
 
+    /**
+     * 分词搜索
+     * @param query
+     * @param index
+     * @return
+     */
     @Watched(prefix = "index")
     private IdHolderList doSearchIndex(ConditionQuery query,
                                        MatchedIndex index) {
@@ -735,6 +762,12 @@ public class GraphIndexTransaction extends AbstractTransaction {
         return query;
     }
 
+    /**
+     * 分词是否匹配
+     * @param propValue
+     * @param fieldValue
+     * @return
+     */
     private boolean matchSearchIndexWords(String propValue, String fieldValue) {
         Set<String> propValues = this.segmentWords(propValue);
         Set<String> words = this.segmentWords(fieldValue);
@@ -1294,6 +1327,9 @@ public class GraphIndexTransaction extends AbstractTransaction {
         this.doRemove(this.serializer.writeIndex(index));
     }
 
+    /**
+     * 将schemaLabel查询转换为indexLabel查询
+     */
     private static class MatchedIndex {
 
         private SchemaLabel schemaLabel;
@@ -1313,6 +1349,11 @@ public class GraphIndexTransaction extends AbstractTransaction {
             return Collections.unmodifiableSet(this.indexLabels);
         }
 
+        /**
+         * 将schemaLabel查询转换为indexLabel查询
+         * @param query
+         * @return
+         */
         public IndexQueries constructIndexQueries(ConditionQuery query) {
             // Condition query => Index Queries
             if (this.indexLabels().size() == 1) {

@@ -59,6 +59,14 @@ public class EdgeId implements Id {
     //EdgeId字符串表示形式
     private String cache;
 
+    /**
+     * EdgeId 常规创建方式
+     * @param ownerVertex
+     * @param direction
+     * @param edgeLabelId
+     * @param sortValues
+     * @param otherVertex
+     */
     public EdgeId(HugeVertex ownerVertex, Directions direction,
                   Id edgeLabelId, String sortValues, HugeVertex otherVertex) {
         this(ownerVertex.id(), direction, edgeLabelId,

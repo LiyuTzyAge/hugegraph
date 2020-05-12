@@ -61,8 +61,8 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
 
     protected Id id;
     protected Map<Id, HugeProperty<?>> properties;
-    protected boolean removed;
-    protected boolean fresh;    //是否被提交
+    protected boolean removed;  //删除标识
+    protected boolean fresh;    //是否被提交,在add时被设置false
     protected boolean propLoaded;
 
     public HugeElement(final HugeGraph graph, Id id) {

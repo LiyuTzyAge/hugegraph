@@ -38,12 +38,21 @@ import com.baidu.hugegraph.type.HugeType;
 import com.baidu.hugegraph.type.define.HugeKeys;
 import com.baidu.hugegraph.util.E;
 
+/**
+ * the index of schema name
+ * 元数据的名称索引，通过元数据名称查找对应元数据
+ */
 public class SchemaIndexTransaction extends AbstractTransaction {
 
     public SchemaIndexTransaction(HugeGraph graph, BackendStore store) {
         super(graph, store);
     }
 
+    /**
+     * remove或append元数据名称索引
+     * @param element
+     * @param removed
+     */
     @Watched(prefix = "index")
     public void updateNameIndex(SchemaElement element, boolean removed) {
         if (!this.needIndexForName()) {
@@ -55,23 +64,35 @@ public class SchemaIndexTransaction extends AbstractTransaction {
         HugeIndex index = new HugeIndex(indexLabel);
         index.fieldValues(element.name());
         index.elementIds(element.id());
-
+        //删除
         if (removed) {
             this.doEliminate(this.serializer.writeIndex(index));
         } else {
+            //新增
             this.doAppend(this.serializer.writeIndex(index));
         }
     }
 
+    /**
+     * 是否支持通过名称定位元数据，如果不支持返回true，需要通过单独建立索
+     * 引实现（元数据名称定为元数据）
+     * @return
+     */
     private boolean needIndexForName() {
         return !this.store().features().supportsQuerySchemaByName();
     }
 
+    /**
+     * 执行元数据名称查询，如果无索引则由底层查询，有索引则通过索引查询
+     * @param query
+     * @return
+     */
     @Watched(prefix = "index")
     @Override
     public QueryResults query(Query query) {
         if (query instanceof ConditionQuery) {
             ConditionQuery q = (ConditionQuery) query;
+            //如果是元数据名称等值查询，则通过索引查询，否则执行原始查询
             if (q.allSysprop() && q.conditions().size() == 1 &&
                 q.containsCondition(HugeKeys.NAME)) {
                 return this.queryByName(q);
@@ -80,6 +101,11 @@ public class SchemaIndexTransaction extends AbstractTransaction {
         return super.query(query);
     }
 
+    /**
+     * 通过元数据名称索引，与元数据名称。查询元数据
+     * @param query
+     * @return
+     */
     @Watched(prefix = "index")
     private QueryResults queryByName(ConditionQuery query) {
         if (!this.needIndexForName()) {
@@ -96,11 +122,13 @@ public class SchemaIndexTransaction extends AbstractTransaction {
         indexQuery.eq(HugeKeys.INDEX_LABEL_ID, il.id());
 
         IdQuery idQuery = new IdQuery(query.resultType(), query);
+        //查询 the index of schema name
         Iterator<BackendEntry> entries = super.query(indexQuery).iterator();
         try {
             while (entries.hasNext()) {
                 HugeIndex index = this.serializer.readIndex(graph(), indexQuery,
                                                             entries.next());
+                //elementIds = schema.id
                 idQuery.query(index.elementIds());
                 Query.checkForceCapacity(idQuery.ids().size());
             }
@@ -113,6 +141,7 @@ public class SchemaIndexTransaction extends AbstractTransaction {
         }
 
         assert idQuery.ids().size() == 1 : idQuery.ids();
+        //通过 schema id 查询schema
         return super.query(idQuery);
     }
 }
