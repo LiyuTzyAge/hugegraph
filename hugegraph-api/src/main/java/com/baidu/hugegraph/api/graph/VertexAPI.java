@@ -192,7 +192,7 @@ public class VertexAPI extends BatchAPI {
 
         Id id = checkAndParseVertexId(idValue);
         // Parse action param
-        boolean append = checkAndParseAction(action);
+        boolean append = checkAndParseAction(action); //only append or eliminate
 
         HugeGraph g = graph(manager, graph);
         HugeVertex vertex = (HugeVertex) g.vertices(id).next();
@@ -207,7 +207,7 @@ public class VertexAPI extends BatchAPI {
         }
 
         commit(g, () -> updateProperties(vertex, jsonVertex, append));
-
+        //将vertex作为结果
         return manager.serializer(g).writeVertex(vertex);
     }
 

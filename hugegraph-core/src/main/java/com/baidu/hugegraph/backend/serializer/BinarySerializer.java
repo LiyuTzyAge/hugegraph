@@ -263,7 +263,7 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
-     * 边 property
+     * 边 property/vertex property hbase
      * 批量序列化多个属性 与 formatproperty格式不同
      * size+[property_id+property_value]
      * @param props

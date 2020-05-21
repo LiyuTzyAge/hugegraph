@@ -153,15 +153,21 @@ public class BatchAPI extends API {
         }
     }
 
+    /**
+     * 更新vertex 属性
+     * @param element
+     * @param jsonElement
+     * @param append 覆盖或删除
+     */
     protected static void updateProperties(HugeElement element,
                                            JsonElement jsonElement,
                                            boolean append) {
         for (Map.Entry<String, Object> e : jsonElement.properties.entrySet()) {
             String key = e.getKey();
             Object value = e.getValue();
-            if (append) {
+            if (append) {   //override
                 element.property(key, value);
-            } else {
+            } else {    //eliminate
                 element.property(key).remove();
             }
         }

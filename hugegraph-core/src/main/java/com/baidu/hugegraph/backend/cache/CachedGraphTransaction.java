@@ -268,7 +268,7 @@ public final class CachedGraphTransaction extends GraphTransaction {
             super.commitMutation2Backend(mutations);
             // Update vertex cache
             for (HugeVertex vertex : changes) {
-                //提交结束后关闭事务
+                //提交结束后关闭事务，缓存中的数据不携带Tx
                 vertex = vertex.resetTx();
                 this.verticesCache.updateIfPresent(vertex.id(), vertex);
             }

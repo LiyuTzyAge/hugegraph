@@ -78,6 +78,13 @@ public class API {
         return g;
     }
 
+    /**
+     * 请求自动提交，失败回滚
+     * @param g
+     * @param callable
+     * @param <R>
+     * @return
+     */
     public static <R> R commit(HugeGraph g, Callable<R> callable) {
         Consumer<Throwable> rollback = (error) -> {
             if (error != null) {
@@ -91,7 +98,7 @@ public class API {
         };
 
         try {
-            R result = callable.call();
+            R result = callable.call(); //同步执行
             g.tx().commit();
             succeedMeter.mark();
             return result;

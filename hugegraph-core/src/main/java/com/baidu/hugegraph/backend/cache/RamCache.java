@@ -178,13 +178,13 @@ public class RamCache implements Cache {
                  */
                 removed = null;
             }
-
+            //删除原有记录
             // Remove the old node if exists
             LinkNode<Id, Object> node = this.map.get(id);
             if (node != null) {
                 this.queue.remove(node);
             }
-
+            //写入队列尾部
             // Add the new item to tail of the queue, then map it
             this.map.put(id, this.queue.enqueue(id, value));
         } finally {

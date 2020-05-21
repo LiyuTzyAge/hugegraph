@@ -431,16 +431,16 @@ public class HugeGraph implements GremlinGraph {
         ).create();
     }
 
+    public Iterator<Vertex> vertices(Query query) {
+        return this.graphTransaction().queryVertices(query);
+    }
+
     @Override
     public Iterator<Vertex> vertices(Object... objects) {
         if (objects.length == 0) {
             return this.graphTransaction().queryVertices();
         }
         return this.graphTransaction().queryVertices(objects);
-    }
-
-    public Iterator<Vertex> vertices(Query query) {
-        return this.graphTransaction().queryVertices(query);
     }
 
     @Override
@@ -722,6 +722,9 @@ public class HugeGraph implements GremlinGraph {
             return this.opened.get();
         }
 
+        /**
+         * 在哪调用？？？
+         */
         @Override
         protected void doOpen() {
             this.getOrNewTransaction();
@@ -814,6 +817,9 @@ public class HugeGraph implements GremlinGraph {
             return txs;
         }
 
+        /**
+         * 销毁当前线程对应Txs
+         */
         private void destroyTransaction() {
             if (this.isOpen()) {
                 throw new HugeException(

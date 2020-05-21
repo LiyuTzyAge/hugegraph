@@ -108,8 +108,9 @@ public class GraphTransaction extends IndexableTransaction {
     private Set<HugeProperty<?>> removedProps;
 
     // These are used to rollback state
-    private Map<Id, HugeVertex> updatedVertices;
-    private Map<Id, HugeEdge> updatedEdges;
+    //属性update相关的缓存
+    private Map<Id, HugeVertex> updatedVertices;    //属性变更的vertex
+    private Map<Id, HugeEdge> updatedEdges;     //属性变更的edge
     private Set<HugeProperty<?>> updatedOldestProps; // Oldest props
 
     //事务锁,粒度图级别--》graph name
@@ -496,7 +497,7 @@ public class GraphTransaction extends IndexableTransaction {
             this.locksTable.lockReads(LockUtil.INDEX_LABEL_DELETE,
                                       vertex.schemaLabel().indexLabels());
             // Ensure vertex label still exists from vertex-construct to lock
-            //确认 vertex label 仍然存在
+            //确认 vertex label 仍然存在，防止其他线程在lock之前把vetex label删除
             this.graph().vertexLabel(vertex.schemaLabel().id());
             /*
              * No need to lock VERTEX_LABEL_ADD_UPDATE, because vertex label
@@ -860,6 +861,11 @@ public class GraphTransaction extends IndexableTransaction {
         return edges;
     }
 
+    /**
+     * 写入属性
+     * @param prop 无其他属性值
+     * @param <V>
+     */
     @Watched(prefix = "graph")
     public <V> void addVertexProperty(HugeVertexProperty<V> prop) {
         // NOTE: this method can also be used to update property
@@ -869,7 +875,7 @@ public class GraphTransaction extends IndexableTransaction {
                      "No owner for updating property '%s'", prop.key());
 
         // Add property in memory for new created vertex
-        if (vertex.fresh()) {
+        if (vertex.fresh()) {   // new created vertex 在内存中还未提交
             // The owner will do property update
             vertex.setProperty(prop);
             return;
@@ -894,6 +900,8 @@ public class GraphTransaction extends IndexableTransaction {
             this.indexTx.updateVertexIndex(vertex, true);
             // Update(add) vertex property
             this.propertyUpdated(vertex, prop, vertex.setProperty(prop));
+            //vertex 包含全部属性（修改之前）
+            //vertex.setProperty(prop) 返回旧属性
         });
     }
 
@@ -931,6 +939,7 @@ public class GraphTransaction extends IndexableTransaction {
         // Do property update
         this.lockForUpdateProperty(vertex.schemaLabel(), prop, () -> {
             // Update old vertex to remove index (with the property)
+            //删除索引旧值
             this.indexTx.updateVertexIndex(vertex, true);
             // Update(remove) vertex property
             HugeProperty<?> removed = vertex.removeProperty(propKey.id());
@@ -1379,7 +1388,8 @@ public class GraphTransaction extends IndexableTransaction {
     }
 
     /**
-     * 根据prop.id 锁定schema label与index label ，执行callback
+     * 锁定Element schema label与index label ，执行callback
+     * 通过prop.id查找index label
      * @param schemaLabel
      * @param prop
      * @param callback
@@ -1400,7 +1410,7 @@ public class GraphTransaction extends IndexableTransaction {
                        LockUtil.VERTEX_LABEL_DELETE :
                        LockUtil.EDGE_LABEL_DELETE;
         try {
-            //lock schema label
+            //lock schema label and index label
             this.locksTable.lockReads(group, schemaLabel.id());
             this.locksTable.lockReads(LockUtil.INDEX_LABEL_DELETE, indexIds);
             // Ensure schema label still exists
@@ -1581,25 +1591,27 @@ public class GraphTransaction extends IndexableTransaction {
     }
 
     /**
-     * 更新property
+     * 更新property事务缓存，记录写入与删除的property
      * @param element
      * @param property
      * @param oldProperty
      */
     private void propertyUpdated(HugeElement element, HugeProperty<?> property,
                                  HugeProperty<?> oldProperty) {
+        //登记element
         if (element.type().isVertex()) {
             this.updatedVertices.put(element.id(), (HugeVertex) element);
         } else {
             assert element.type().isEdge();
             this.updatedEdges.put(element.id(), (HugeEdge) element);
         }
-
+        //保存oldProperty
         if (oldProperty != null) {
             this.updatedOldestProps.add(oldProperty);
         }
+        //属性缓存
         if (property == null) {
-            this.removedProps.add(oldProperty);
+            this.removedProps.add(oldProperty); //保存要删除的propery
         } else {
             this.addedProps.remove(property);
             this.addedProps.add(property);

@@ -187,7 +187,9 @@ public abstract class AbstractTransaction implements Transaction {
     @Override
     public void rollback() throws BackendException {
         LOG.debug("Transaction rollback()...");
+        //回滚缓存
         this.reset();
+        //如果已经写入store，则回滚store
         if (this.committing2Backend) {
             this.committing2Backend = false;
             this.store.rollbackTx();
@@ -298,14 +300,15 @@ public abstract class AbstractTransaction implements Transaction {
          * The mutation will be reset after commit, in order to log the
          * mutation after failure, let's save it to a local variable.
          */
+        //保持上次操作内容，上次mutation应该已经被提交了？？
         BackendMutation mutation = this.mutation();
 
         try {
-            // Do commit
+            // Do commit ,auto unlock
             this.commit();
         } catch (Throwable e1) {
             LOG.error("Failed to commit changes:", e1);
-            // Do rollback
+            // Do rollback , auto unlock
             try {
                 this.rollback();
             } catch (Throwable e2) {
@@ -318,7 +321,7 @@ public abstract class AbstractTransaction implements Transaction {
     }
 
     /**
-     * 必须有事务本身的线程提交
+     * 必须由事务本身的线程提交
      */
     protected void checkOwnerThread() {
         if (Thread.currentThread() != this.ownerThread) {

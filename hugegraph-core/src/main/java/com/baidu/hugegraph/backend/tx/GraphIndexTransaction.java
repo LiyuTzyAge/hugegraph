@@ -142,7 +142,7 @@ public class GraphIndexTransaction extends AbstractTransaction {
     /**
      * 更新vertex index
      * @param vertex
-     * @param removed
+     * @param removed true 删除索引
      */
     @Watched(prefix = "index")
     public void updateVertexIndex(HugeVertex vertex, boolean removed) {

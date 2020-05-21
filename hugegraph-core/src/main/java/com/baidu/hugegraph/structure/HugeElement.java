@@ -62,8 +62,8 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
     protected Id id;
     protected Map<Id, HugeProperty<?>> properties;
     protected boolean removed;  //删除标识
-    protected boolean fresh;    //是否被提交,在add时被设置false
-    protected boolean propLoaded;
+    protected boolean fresh;    //是否被提交,在commit-add时被设置false
+    protected boolean propLoaded; //property 是否被加载
 
     public HugeElement(final HugeGraph graph, Id id) {
         E.checkArgument(graph != null, "HugeElement graph can't be null");
@@ -170,6 +170,12 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
         return this.properties.size();
     }
 
+    /**
+     * 设置新值，返回旧值
+     * @param prop
+     * @param <V>
+     * @return
+     */
     @Watched(prefix = "element")
     public <V> HugeProperty<?> setProperty(HugeProperty<V> prop) {
         if (this.properties == EMPTY) {
@@ -179,31 +185,39 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
         E.checkArgument(this.properties.containsKey(pkey.id()) ||
                         this.properties.size() < MAX_PROPERTIES,
                         "Exceeded the maximum number of properties");
-        return this.properties.put(pkey.id(), prop);
+        return this.properties.put(pkey.id(), prop);    //返回旧值
     }
 
     public <V> HugeProperty<?> removeProperty(Id key) {
         return this.properties.remove(key);
     }
 
-    public <V> HugeProperty<V> addProperty(PropertyKey pkey, V value) {
-        return this.addProperty(pkey, value, false);
-    }
-
+    /**
+     * 对Element写入property，notify=true为对vertex执行事务流程，
+     * notify=false，只用来构建element对象，用于反序列化构建element
+     * @param pkey key
+     * @param value value
+     * @param notify true写入执行事务操作/false 构建element不执行事务
+     * @param <V>
+     * @return
+     */
     @Watched(prefix = "element")
     public <V> HugeProperty<V> addProperty(PropertyKey pkey, V value,
                                            boolean notify) {
         HugeProperty<V> prop = null;
         switch (pkey.cardinality()) {
             case SINGLE:
+                //property<owner,pkey,value> 无其他属性值
                 prop = this.newProperty(pkey, value);
-                if (notify) {
+                if (notify) { //notify=true 事务流程
                     /*
                      * NOTE: this method should be called before setProperty()
                      * because tx need to delete index without the new property
                      */
+                    //在写入新数据前要删除旧索引数据??
                     this.onUpdateProperty(pkey.cardinality(), prop);
                 }
+                //将属性写入vertex内存中
                 this.setProperty(prop);
                 break;
             case SET:
@@ -223,6 +237,10 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
                 break;
         }
         return prop;
+    }
+
+    public <V> HugeProperty<V> addProperty(PropertyKey pkey, V value) {
+        return this.addProperty(pkey, value, false);
     }
 
     @Watched(prefix = "element")
@@ -329,6 +347,7 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
             } else if (key.equals(T.label)) {
                 elemKeys.label = val;
             } else {
+                //property 解析参数，只存储propertyKey，value忽略
                 elemKeys.keys.add(key.toString());
             }
         }
@@ -400,9 +419,11 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
         return labelValue;
     }
 
+    //存储element.id/element.value/propertyKeys
     public static final class ElementKeys {
-
+        //element label 当代表property时可为null
         private Object label = null;
+        //element id
         private Object id = null;
         //property key
         private Set<String> keys = new HashSet<>();
