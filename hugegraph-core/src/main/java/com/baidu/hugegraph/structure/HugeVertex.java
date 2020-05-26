@@ -261,7 +261,7 @@ public class HugeVertex extends HugeElement implements Vertex, Cloneable {
     @Watched(prefix = "vertex")
     @Override
     public HugeEdge addEdge(String label, Vertex vertex, Object... keyValues) {
-        ElementKeys elemKeys = HugeElement.classifyKeys(keyValues);
+        ElementKeys elemKeys = HugeElement.classifyKeys(keyValues); //property
         // Check id (must be null)
         if (elemKeys.id() != null) {
             throw Edge.Exceptions.userSuppliedIdsNotSupported();

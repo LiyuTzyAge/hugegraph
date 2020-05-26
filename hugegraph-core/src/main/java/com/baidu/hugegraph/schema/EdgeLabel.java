@@ -37,6 +37,7 @@ public class EdgeLabel extends SchemaLabel {
     private Id sourceLabel;
     private Id targetLabel;
     private Frequency frequency;
+    //作为边排序property.id
     private List<Id> sortKeys;
 
     public EdgeLabel(final HugeGraph graph, Id id, String name) {

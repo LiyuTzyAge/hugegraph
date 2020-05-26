@@ -100,7 +100,7 @@ public class GraphTransaction extends IndexableTransaction {
     //事务写数据缓存
     private Map<Id, HugeVertex> addedVertices;
     private Map<Id, HugeVertex> removedVertices;
-
+    //edge id.direction = out
     private Map<Id, HugeEdge> addedEdges;
     private Map<Id, HugeEdge> removedEdges;
 
@@ -587,6 +587,11 @@ public class GraphTransaction extends IndexableTransaction {
         });
     }
 
+    /**
+     * 根据vertex id查询
+     * @param vertexIds
+     * @return
+     */
     public Iterator<Vertex> queryVertices(Object... vertexIds) {
         Query.checkForceCapacity(vertexIds.length);
 
@@ -600,21 +605,24 @@ public class GraphTransaction extends IndexableTransaction {
             Id id = HugeVertex.getIdValue(vertexId);
             if (id == null || this.removedVertices.containsKey(id)) {
                 // The record has been deleted
+                //跳过删除的与null的vertex
                 continue;
             } else if ((vertex = this.addedVertices.get(id)) != null ||
                        (vertex = this.updatedVertices.get(id)) != null) {
                 // Found from local tx
+                //事务缓存中未提交的数据
                 vertices.put(vertex.id(), vertex);
             } else {
                 // Prepare to query from backend store
                 query.query(id);
             }
-            ids.add(id);
+            ids.add(id);    //排除删除与null的id集合List
         }
 
         if (!query.empty()) {
             // Query from backend store
             if (vertices.isEmpty() && query.ids().size() == ids.size()) {
+                //不需要合并结果，将查询结果直接返回
                 // Sort at the lower layer and return directly
                 Iterator<HugeVertex> it = this.queryVerticesFromBackend(query);
                 @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -623,9 +631,9 @@ public class GraphTransaction extends IndexableTransaction {
             }
             query.mustSortByInput(false);
             Iterator<HugeVertex> it = this.queryVerticesFromBackend(query);
-            QueryResults.fillMap(it, vertices);
+            QueryResults.fillMap(it, vertices); //将查询结果与事务缓存合并
         }
-
+        //根据ids返回查询结果
         return new MapperIterator<>(ids.iterator(), id -> {
             return vertices.get(id);
         });
@@ -691,7 +699,9 @@ public class GraphTransaction extends IndexableTransaction {
     @Watched(prefix = "graph")
     public HugeEdge addEdge(HugeEdge edge) {
         this.checkOwnerThread();
-
+        //edge 写入是固定的，src.addEdge(dest),所以removeEdges中的id方向是一致的
+        //src>dest
+        //edge remove时，方向是否也固定 = out
         // Override edges in local `removedEdges`
         this.removedEdges.remove(edge.id());
         try {

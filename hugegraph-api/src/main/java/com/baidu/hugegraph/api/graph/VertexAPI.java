@@ -266,6 +266,7 @@ public class VertexAPI extends BatchAPI {
         HugeGraph g = graph(manager, graph);
         Iterator<Vertex> vertices = g.vertices(id);
         checkExist(vertices, HugeType.VERTEX, idValue);
+        //返回结果序列化
         return manager.serializer(g).writeVertex(vertices.next());
     }
 

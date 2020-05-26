@@ -324,6 +324,7 @@ public class EdgeAPI extends BatchAPI {
         LOG.debug("Graph [{}] get edge by id '{}'", graph, id);
 
         HugeGraph g = graph(manager, graph);
+        //g.edges(id) 只查询edge，未查询vertex，vertex中无property信息
         Iterator<Edge> edges = g.edges(id);
         checkExist(edges, HugeType.EDGE, id);
         return manager.serializer(g).writeEdge(edges.next());

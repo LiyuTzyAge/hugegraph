@@ -435,6 +435,11 @@ public class HugeGraph implements GremlinGraph {
         return this.graphTransaction().queryVertices(query);
     }
 
+    /**
+     * 根据vertex id 查询vertex。如果未使用id，则查询所有的vertex
+     * @param objects
+     * @return
+     */
     @Override
     public Iterator<Vertex> vertices(Object... objects) {
         if (objects.length == 0) {
@@ -618,6 +623,7 @@ public class HugeGraph implements GremlinGraph {
         return names;
     }
 
+    //将property name转换成 property id
     public List<Id> mapPkName2Id(Collection<String> pkeys) {
         List<Id> ids = new ArrayList<>(pkeys.size());
         for (String pkey : pkeys) {
