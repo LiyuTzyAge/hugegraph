@@ -41,7 +41,7 @@ public abstract class AbstractBackendStoreProvider
     private String graph = null;
 
     private EventHub storeEventHub = new EventHub("store");
-
+    //m,s,g
     protected Map<String, BackendStore> stores = null;
 
     /**
@@ -105,9 +105,13 @@ public abstract class AbstractBackendStoreProvider
         this.storeEventHub.notify(Events.STORE_CLOSE, this);
     }
 
+    /**
+     * 初始化后端，创建namespace或table
+     */
     @Override
     public void init() {
         this.checkOpened();
+        //system/schema/graph
         for (BackendStore store : this.stores.values()) {
             store.init();
         }
@@ -143,6 +147,10 @@ public abstract class AbstractBackendStoreProvider
         LOG.debug("Graph '{}' store has been truncated", this.graph);
     }
 
+    /**
+     * 初始化backend info
+     * @param graph
+     */
     @Override
     public void initSystemInfo(HugeGraph graph) {
         this.checkOpened();
@@ -154,9 +162,9 @@ public abstract class AbstractBackendStoreProvider
     }
 
     /**
-     * init graph schema
+     * init graph schema，初始化store下面的表
      * 不同的store映射不同的tables
-     * @param name
+     * @param name m
      * @return
      */
     @Override
@@ -176,7 +184,7 @@ public abstract class AbstractBackendStoreProvider
     }
 
     /**
-     * init graph store
+     * init graph store，初始化store下面的表
      * @param name g
      * @return
      */
@@ -197,7 +205,7 @@ public abstract class AbstractBackendStoreProvider
     }
 
     /**
-     * init system store
+     * init system store，初始化store下面的表
      * @param name s
      * @return
      */

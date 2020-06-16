@@ -104,6 +104,9 @@ public final class ApiVersion {
     // The second parameter of Version.of() is for IDE running without JAR
     public static final Version VERSION = Version.of(ApiVersion.class, "0.50");
 
+    /**
+     * 检查core版本
+     */
     public static final void check() {
         // Check version of hugegraph-core. Firstly do check from version 0.3
         VersionUtil.check(CoreVersion.VERSION, "0.11", "0.12", CoreVersion.NAME);

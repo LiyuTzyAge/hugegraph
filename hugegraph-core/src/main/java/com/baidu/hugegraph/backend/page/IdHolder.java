@@ -35,9 +35,16 @@ import com.baidu.hugegraph.iterator.CIter;
 import com.baidu.hugegraph.iterator.Metadatable;
 import com.baidu.hugegraph.util.E;
 
+/**
+ * 索引查询封装类，查询索引，返回相关结果elementIds
+ * PageIds fetchNext(String page, long pageSize)
+ * 支持分页模式PagingIdHolder
+ * 联合索引，不支持分页FixedIdHolder
+ */
 public abstract class IdHolder {
 
     protected final Query query;
+    //分页数据是否枯竭
     protected boolean exhausted;
 
     public IdHolder(Query query) {
@@ -56,16 +63,19 @@ public abstract class IdHolder {
                              this.getClass().getSimpleName(),
                              this.query.originQuery(), this.query);
     }
-
+    //是否为分页模式
     public abstract boolean paging();
-
+    //返回所有结果ids
     public abstract Set<Id> all();
-
+    //获取下一页结果
     public abstract PageIds fetchNext(String page, long pageSize);
 
+    /**
+     * 用于联合索引，不支持分页
+     */
     public static class FixedIdHolder extends IdHolder {
 
-        // Used by Joint Index
+        // Used by Joint Index 联合索引
         private final Set<Id> ids;
 
         public FixedIdHolder(Query query, Set<Id> ids) {
@@ -89,8 +99,11 @@ public abstract class IdHolder {
         }
     }
 
+    /**
+     * 索引查询分页模式
+     */
     public static class PagingIdHolder extends IdHolder {
-
+        //索引查询，根据ConditionQuery返回命中elementIds
         private final Function<ConditionQuery, PageIds> fetcher;
 
         public PagingIdHolder(ConditionQuery query,
@@ -106,6 +119,12 @@ public abstract class IdHolder {
             return true;
         }
 
+        /**
+         * 根据分页信息返回PageIds
+         * @param page
+         * @param pageSize
+         * @return
+         */
         @Override
         public PageIds fetchNext(String page, long pageSize) {
             if (this.exhausted) {
@@ -129,12 +148,18 @@ public abstract class IdHolder {
         }
     }
 
+    /**
+     * 索引批量模式，不支持分页模式
+     * 一次索引查询所有数据，每次获取并反序列化batchSize数量的数据
+     * 最后返回pageIds
+     */
     public static class BatchIdHolder extends IdHolder
                                       implements CIter<IdHolder> {
-
+        //索引底层查询结果Iterator，query执行结果
         private final Iterator<BackendEntry> entries;
+        //根据batchSize遍历entries的执行函数，返回指定数量的结果
         private final Function<Long, Set<Id>> fetcher;
-        private long count;
+        private long count;     //已返回的数据总量
 
         public BatchIdHolder(ConditionQuery query,
                              Iterator<BackendEntry> entries,
@@ -150,6 +175,10 @@ public abstract class IdHolder {
             return false;
         }
 
+        /**
+         * 是否还有数据未处理
+         * @return
+         */
         @Override
         public boolean hasNext() {
             if (this.exhausted) {
@@ -170,6 +199,12 @@ public abstract class IdHolder {
             return this;
         }
 
+        /**
+         * 遍历entries，返回batchSize数量的PageIds
+         * @param page null
+         * @param batchSize 批次大小
+         * @return
+         */
         @Override
         public PageIds fetchNext(String page, long batchSize) {
             E.checkArgument(page == null,
@@ -187,6 +222,7 @@ public abstract class IdHolder {
             Set<Id> ids = this.fetcher.apply(batchSize);
             int size = ids.size();
             this.count += size;
+            //已经没有剩余数据了
             if (size < batchSize || size == 0) {
                 this.close();
             }
@@ -199,6 +235,10 @@ public abstract class IdHolder {
             }
         }
 
+        /**
+         * 返回所有数据
+         * @return
+         */
         @Override
         public Set<Id> all() {
             Set<Id> ids = this.fetcher.apply(this.remaining());
@@ -207,14 +247,24 @@ public abstract class IdHolder {
             return ids;
         }
 
+        /**
+         * 剩余的数据量
+         * @return
+         */
         private long remaining() {
             if (this.query.nolimit()) {
+                //返回Long最大数量
                 return Query.NO_LIMIT;
             } else {
+                //offset+limit 等于查询的所有数据
+                //offset+limit-count 剩余的数量
                 return this.query.total() - this.count;
             }
         }
 
+        /**
+         * 关闭entries迭代器
+         */
         @Override
         public void close() {
             if (this.exhausted) {

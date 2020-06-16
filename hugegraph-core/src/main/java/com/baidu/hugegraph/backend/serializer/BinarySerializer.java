@@ -565,6 +565,9 @@ public class BinarySerializer extends AbstractSerializer {
     /**
      * read vertex from BackendEntry which is the data of (vertex or edge).
      * Result is the edge or properties of the vertex.
+     * 反序列化vertex，写入edge数据或properties
+     * 查询edge--》bytesEntry是edge数据，则向vertex中添加edge
+     * 查询vertex--》bytesEntry是vertex数据，则想vertex中写入properties
      * @param graph
      * @param bytesEntry 可能是Edge或Vertex
      * @return
@@ -578,6 +581,10 @@ public class BinarySerializer extends AbstractSerializer {
 
         // Parse id
         Id id = entry.id().origin();
+        /*
+         id.edge()==true 查询edge，同时构建相关vertex
+         id.edge()==false 查询vertex，构建vertex
+         */
         //ownerVertexId or vertexId
         Id vid = id.edge() ? ((EdgeId) id).ownerVertexId() : id;
         HugeVertex vertex = new HugeVertex(graph, vid, VertexLabel.NONE);
@@ -733,6 +740,7 @@ public class BinarySerializer extends AbstractSerializer {
 
     /**
      *Edge查询序列化
+     * Edge Id Range/Prefix serializer
      * @param query
      * @return
      */
@@ -749,11 +757,13 @@ public class BinarySerializer extends AbstractSerializer {
     }
 
     /**
-     * Edge Range场景查询序列化
+     * Edge Range场景查询序列化,Id Range
      * 将原始查询条件 cq，提取 EdgeRange
      * 必要区间条件（OWNER_VERTEX，DIRECTION,EDGElABEL,min，max等），
      * 将区间条件序列化构造startID与endID BinaryId，
      * 最后封装成：IdPrefixQuery（如果Max=null），IdRangeQuery 进行后续查询
+     * 查询场景：edge有sortValue。否则prefix查询
+     * 查询vertex的direction=？，sortValues=？，label=？的edge
      * @param cq
      * @return
      */
@@ -887,6 +897,7 @@ public class BinarySerializer extends AbstractSerializer {
     protected Query writeQueryCondition(Query query) {
         HugeType type = query.resultType();
         if (!type.isIndex()) {
+            //非索引查询无需序列化
             return query;
         }
         //Query.type isIndex
@@ -932,7 +943,7 @@ public class BinarySerializer extends AbstractSerializer {
      * 索引范围查询,根据condition-》indexId
      * 根据查询条件中的fields，创建RangeConditions 区间条件对象，
      * 根据区间条件对象的等值，最大值，最小值等情况，创建条件的IndexId-min/max。
-     * 最后创建最后创建IdRangeQuery(query, start, keyMinEq, max, keyMaxEq)
+     * 最后创建IdRangeQuery(query, start, keyMinEq, max, keyMaxEq)
      * ConditionQuery->FIELD_VALUES->RangeConditions->min/max/eq->start-indexId/max-indexId->IdRangeQuery
      * @param query
      * @return
@@ -945,7 +956,7 @@ public class BinarySerializer extends AbstractSerializer {
         E.checkArgument(!fields.isEmpty(),
                         "Please specify the index field values");
 
-        HugeType type = query.resultType(); //type
+        HugeType type = query.resultType(); //type=index
         Id start = null;
         if (query.paging() && !query.page().isEmpty()) {
             byte[] position = PageState.fromString(query.page()).position();

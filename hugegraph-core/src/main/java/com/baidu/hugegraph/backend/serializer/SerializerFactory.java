@@ -28,7 +28,7 @@ import com.baidu.hugegraph.backend.BackendException;
  * 如Java-SIP方式的插件注册管理器
  */
 public class SerializerFactory {
-
+    //缓存序列化实例；key=hbase,value=HbaseSerializer
     private static Map<String, Class<? extends AbstractSerializer>> serializers;
 
     static {

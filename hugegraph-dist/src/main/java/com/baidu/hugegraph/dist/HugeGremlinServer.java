@@ -61,6 +61,12 @@ public class HugeGremlinServer {
         return startWithInjectTraversal(conf);
     }
 
+    /**
+     * 启动 ContextGremlinServer ，并在GremlinServer中注册Traversal
+     * @param conf
+     * @return
+     * @throws Exception
+     */
     private static ContextGremlinServer startWithInjectTraversal(String conf)
             throws Exception {
         LOG.info(GremlinServer.getHeader());
@@ -78,8 +84,8 @@ public class HugeGremlinServer {
         ContextGremlinServer server = new ContextGremlinServer(settings);
 
         // Inject customized traversal source
-        server.injectTraversalSource(G_PREFIX);
-
+        server.injectTraversalSource(G_PREFIX); //注册traversal
+        //start GremlinServer 并注册 异常处理流程
         server.start().exceptionally(t -> {
             LOG.error("Gremlin Server was unable to start and will " +
                       "shutdown now: {}", t.getMessage());

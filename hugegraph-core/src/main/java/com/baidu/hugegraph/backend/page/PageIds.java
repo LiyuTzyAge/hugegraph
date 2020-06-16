@@ -24,12 +24,16 @@ import java.util.Set;
 import com.baidu.hugegraph.backend.id.Id;
 import com.google.common.collect.ImmutableSet;
 
+/**
+ * 用于索引查询，记录索引查询的分页信息和elementIds
+ */
 public final class PageIds {
 
     public static final PageIds EMPTY = new PageIds(ImmutableSet.of(),
                                                     PageState.EMPTY);
-
+    //索引关联elementIds
     private final Set<Id> ids;
+    //索引分页信息
     private final PageState pageState;
 
     public PageIds(Set<Id> ids, PageState pageState) {

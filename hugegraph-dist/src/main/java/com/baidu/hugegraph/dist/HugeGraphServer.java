@@ -88,6 +88,11 @@ public class HugeGraphServer {
         }
     }
 
+    /**
+     * gremlin-server.yaml rest-server.properties
+     * @param args
+     * @throws Exception
+     */
     public static void main(String[] args) throws Exception {
         if (args.length != 2) {
             String msg = "HugeGraphServer can only accept two config files";

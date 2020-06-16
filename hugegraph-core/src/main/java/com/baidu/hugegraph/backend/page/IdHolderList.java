@@ -24,6 +24,9 @@ import java.util.Collection;
 
 import com.baidu.hugegraph.util.E;
 
+/**
+ * IdHolderList 以list形式封装多个IdHolder
+ */
 public class IdHolderList extends ArrayList<IdHolder> {
 
     private static final IdHolderList EMPTY_P = new IdHolderList(true);
@@ -33,6 +36,11 @@ public class IdHolderList extends ArrayList<IdHolder> {
 
     private final boolean paging;
 
+    /**
+     * 返回空列表
+     * @param paging 是否分页
+     * @return
+     */
     public static IdHolderList empty(boolean paging) {
         IdHolderList empty = paging ? EMPTY_P : EMPTY_NP;
         empty.clear();

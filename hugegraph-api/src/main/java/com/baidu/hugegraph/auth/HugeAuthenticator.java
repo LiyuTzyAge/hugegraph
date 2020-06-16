@@ -48,6 +48,9 @@ public interface HugeAuthenticator extends Authenticator {
         return true;
     }
 
+    /**
+     * 用户认证实现类，包含用户名、用户角色
+     */
     public static class User extends AuthenticatedUser {
 
         protected static final String USER_ADMIN = ROLE_ADMIN;
@@ -55,7 +58,7 @@ public interface HugeAuthenticator extends Authenticator {
 
         public static final User ADMIN = new User(USER_ADMIN, ROLE_ADMIN);
         public static final User ANONYMOUS = new User(USER_ANONY, ROLE_ADMIN);
-
+        //role = ROLE_ADMIN 或 graph name
         private final String role;
 
         public User(String username, String role) {

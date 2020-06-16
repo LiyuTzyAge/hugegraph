@@ -44,6 +44,10 @@ import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListene
 @ApplicationPath("/")
 public class ApplicationConfig extends ResourceConfig {
 
+    /**
+     * 配置jersey restfull 框架
+     * @param conf
+     */
     public ApplicationConfig(HugeConfig conf) {
         packages("com.baidu.hugegraph.api");
 
@@ -93,6 +97,10 @@ public class ApplicationConfig extends ResourceConfig {
         }
     }
 
+    /**
+     * GraphManager 事件生成工厂类，更具事件返回或生成GraphManager，
+     * 调用由ApplicationEventListener 实现
+     */
     private class GraphManagerFactory extends AbstractBinder
                                       implements Factory<GraphManager> {
 

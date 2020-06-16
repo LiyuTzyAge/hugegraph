@@ -450,16 +450,24 @@ public class GraphTransaction extends IndexableTransaction {
         }
     }
 
+    /**
+     * 实际查询
+     * @param query
+     * @return
+     */
     @Override
     public QueryResults query(Query query) {
+        //IdQuery
         if (!(query instanceof ConditionQuery)) {
             LOG.debug("Query{final:{}}", query);
             return super.query(query);
         }
-
+        //ConditionQuery
         QueryList queries = new QueryList(query, super::query);
+        //分解查询
         for (ConditionQuery cq: ConditionQueryFlatten.flatten(
                                 (ConditionQuery) query)) {
+            //优化查询
             Query q = this.optimizeQuery(cq);
             /*
              * NOTE: There are two possibilities for this query:
@@ -588,11 +596,16 @@ public class GraphTransaction extends IndexableTransaction {
     }
 
     /**
-     * 根据vertex id查询
+     * 根据vertex ids查询,查询结果与输入顺序相同
+     * 流程：
+     * 1.查询tx cache
+     * 2.query from backend
+     * 3.排序结果，与输入ids相同:MapperIterator
      * @param vertexIds
      * @return
      */
     public Iterator<Vertex> queryVertices(Object... vertexIds) {
+        //ids 个数不能超过上限
         Query.checkForceCapacity(vertexIds.length);
 
         // NOTE: allowed duplicated vertices if query by duplicated ids
@@ -603,6 +616,7 @@ public class GraphTransaction extends IndexableTransaction {
         for (Object vertexId : vertexIds) {
             HugeVertex vertex;
             Id id = HugeVertex.getIdValue(vertexId);
+            //查询事务缓存
             if (id == null || this.removedVertices.containsKey(id)) {
                 // The record has been deleted
                 //跳过删除的与null的vertex
@@ -610,7 +624,6 @@ public class GraphTransaction extends IndexableTransaction {
             } else if ((vertex = this.addedVertices.get(id)) != null ||
                        (vertex = this.updatedVertices.get(id)) != null) {
                 // Found from local tx
-                //事务缓存中未提交的数据
                 vertices.put(vertex.id(), vertex);
             } else {
                 // Prepare to query from backend store
@@ -623,6 +636,7 @@ public class GraphTransaction extends IndexableTransaction {
             // Query from backend store
             if (vertices.isEmpty() && query.ids().size() == ids.size()) {
                 //不需要合并结果，将查询结果直接返回
+                //底层排序
                 // Sort at the lower layer and return directly
                 Iterator<HugeVertex> it = this.queryVerticesFromBackend(query);
                 @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -631,9 +645,10 @@ public class GraphTransaction extends IndexableTransaction {
             }
             query.mustSortByInput(false);
             Iterator<HugeVertex> it = this.queryVerticesFromBackend(query);
-            QueryResults.fillMap(it, vertices); //将查询结果与事务缓存合并
+            QueryResults.fillMap(it, vertices); //将查询结果写入vertices
         }
         //根据ids返回查询结果
+        //MapperIterator.ids保证查询顺序
         return new MapperIterator<>(ids.iterator(), id -> {
             return vertices.get(id);
         });
@@ -677,18 +692,28 @@ public class GraphTransaction extends IndexableTransaction {
         return r;
     }
 
+    /**
+     * 执行查询，最后将结果排序
+     * 流程：
+     * 1.query on backend。
+     * 2.serializer
+     * 3.sortByInputIds
+     * @param query
+     * @return
+     */
     protected Iterator<HugeVertex> queryVerticesFromBackend(Query query) {
         assert query.resultType().isVertex();
-
+        //query
         QueryResults results = this.query(query);
         Iterator<BackendEntry> entries = results.iterator();
-
+        //serializer and sort
         Iterator<HugeVertex> vertices = new MapperIterator<>(entries, entry -> {
             HugeVertex vertex = this.serializer.readVertex(graph(), entry);
             assert vertex != null;
             return vertex;
         });
-
+        //sort
+        //如果底层不支持排序，则由上层排序
         if (!this.store().features().supportsQuerySortByInputIds()) {
             // There is no id in BackendEntry, so sort after deserialization
             vertices = results.keepInputOrderIfNeeded(vertices);
@@ -1156,6 +1181,9 @@ public class GraphTransaction extends IndexableTransaction {
 
     /**
      * 优化查询
+     * NOTE: There are two possibilities for this query:
+     * 1.sysprop-query, which would not be empty.
+     * 2.index-query result(ids after optimization), which may be empty.
      * @param query
      * @return
      */

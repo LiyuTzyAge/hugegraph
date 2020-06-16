@@ -261,7 +261,7 @@ public class VertexAPI extends BatchAPI {
                       @PathParam("graph") String graph,
                       @PathParam("id") String idValue) {
         LOG.debug("Graph [{}] get vertex by id '{}'", graph, idValue);
-
+        //转换成id
         Id id = checkAndParseVertexId(idValue);
         HugeGraph g = graph(manager, graph);
         Iterator<Vertex> vertices = g.vertices(id);
@@ -294,6 +294,12 @@ public class VertexAPI extends BatchAPI {
         });
     }
 
+    /**
+     * 检查id格式，并解析。
+     * uuid会单独处理，格式w为: U"sdfsd-fsdf-sfds-safas-dsfa"
+     * @param idValue 请求id的json格式
+     * @return
+     */
     public static Id checkAndParseVertexId(String idValue) {
         if (idValue == null) {
             return null;
@@ -304,6 +310,7 @@ public class VertexAPI extends BatchAPI {
         }
         try {
             Object id = JsonUtil.fromJson(idValue, Object.class);
+            //uuid 类型id需要单独处理
             return uuid ? Text.uuid((String) id) : HugeVertex.getIdValue(id);
         } catch (Exception e) {
             throw new IllegalArgumentException(String.format(

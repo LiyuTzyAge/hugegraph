@@ -184,6 +184,11 @@ public class HugeGraphAuthProxy implements GremlinGraph {
         this.hugegraph.truncateBackend();
     }
 
+    /**
+     * The owner role should match the graph name
+     * 如果 role != ROLE_ADMIN ，则role需要等于 graph name，
+     * 否则没有权限
+     */
     private void verifyPermission() {
         /*
          * The owner role should match the graph name
@@ -193,6 +198,10 @@ public class HugeGraphAuthProxy implements GremlinGraph {
         this.verifyPermission(this.hugegraph.name());
     }
 
+    /**
+     * 比对 role 名称，等于 ROLE_ADMIN或graph name，否则无权限
+     * @param permission graph name
+     */
     private void verifyPermission(String permission) {
         Context context = getContext();
         E.checkState(context != null,
@@ -223,14 +232,25 @@ public class HugeGraphAuthProxy implements GremlinGraph {
         contexts.set(context);
     }
 
+    /**
+     * 返回回当前线程的Context
+     * 如果返回null，后续如何处理
+     * @return
+     */
     public static Context getContext() {
         return contexts.get();
     }
 
+    /**
+     * 删除当前线程的value
+     */
     public static void resetContext() {
         contexts.remove();
     }
 
+    /**
+     * 用户认证信息上下文
+     */
     public static class Context {
 
         private static final Context ADMIN =
@@ -251,6 +271,9 @@ public class HugeGraphAuthProxy implements GremlinGraph {
         }
     }
 
+    /**
+     * 封装了用户信息的线程池，提交线程时将对每个线程封装ContextTask
+     */
     public static class ContextThreadPoolExecutor extends ThreadPoolExecutor {
 
         public ContextThreadPoolExecutor(int corePoolSize, int maxPoolSize,
@@ -265,12 +288,16 @@ public class HugeGraphAuthProxy implements GremlinGraph {
         }
     }
 
+    /**
+     * 线程封装类，为每个线程添加用户认证上下文
+     */
     public static class ContextTask implements Runnable {
 
         private final Runnable runner;
         private final Context context;
 
         public ContextTask(Runnable runner) {
+            //context 当前线程的用户Context
             this.context = HugeGraphAuthProxy.getContext();
             this.runner = runner;
         }

@@ -370,6 +370,11 @@ public abstract class HugeElement implements Element, GraphType, Idfiable {
         }
     }
 
+    /**
+     * 根据idvalue类型，返回Id实例
+     * @param idValue
+     * @return
+     */
     @Watched(prefix = "element")
     protected static Id getIdValue(Object idValue) {
         if (idValue == null) {

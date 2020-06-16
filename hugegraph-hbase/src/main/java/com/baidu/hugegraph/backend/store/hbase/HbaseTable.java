@@ -170,7 +170,7 @@ public class HbaseTable extends BackendTable<Session, BackendEntry> {
             return newEntryIterator(rowIterator, query);
         }
 
-        // Query by condition (or condition + id)
+        // Query by condition (or condition + id) for metadata
         ConditionQuery cq = (ConditionQuery) query;
         return newEntryIterator(this.queryByCond(session, cq), query);
     }
@@ -209,6 +209,12 @@ public class HbaseTable extends BackendTable<Session, BackendEntry> {
                             end, query.inclusiveEnd());
     }
 
+    /**
+     * 元数据扫描
+     * @param session
+     * @param query
+     * @return
+     */
     protected RowIterator queryByCond(Session session, ConditionQuery query) {
         if (query.containsScanCondition()) {
             E.checkArgument(query.relations().size() == 1,
@@ -220,8 +226,16 @@ public class HbaseTable extends BackendTable<Session, BackendEntry> {
         throw new NotSupportException("query: %s", query);
     }
 
+    /**
+     * 范围查询，Shard.start与end必须是int
+     * @param session
+     * @param shard
+     * @param page
+     * @return
+     */
     protected RowIterator queryByRange(Session session, Shard shard,
                                        String page) {
+        //int value
         byte[] start = this.shardSpliter.position(shard.start());
         byte[] end = this.shardSpliter.position(shard.end());
         if (page != null && !page.isEmpty()) {

@@ -26,15 +26,25 @@ import com.baidu.hugegraph.backend.serializer.BytesBuffer;
 import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.E;
 
+/**
+ * page的状态信息
+ */
 public class PageState {
 
     public static final byte[] EMPTY_BYTES = new byte[0];
+    //代表第一个page
     public static final PageState EMPTY = new PageState(EMPTY_BYTES, 0, 0);
 
     private final byte[] position;
-    private final int offset;
+    private final int offset;   //column偏移量
     private final int total;
 
+    /**
+     *
+     * @param position page rowkey字节，或Map结构的字符串，UTF-8编码
+     * @param offset column偏移量
+     * @param total 所有page返回的总量
+     */
     public PageState(byte[] position, int offset, int total) {
         E.checkNotNull(position, "position");
         this.position = position;
@@ -50,10 +60,18 @@ public class PageState {
         return this.offset;
     }
 
+    /**
+     * page数据总量
+     * @return
+     */
     public long total() {
         return this.total;
     }
 
+    /**
+     * 返回page的字符串形式
+     * @return
+     */
     @Override
     public String toString() {
         if (Bytes.equals(this.position(), EMPTY_BYTES)) {
@@ -62,6 +80,11 @@ public class PageState {
         return toString(this.toBytes());
     }
 
+    /**
+     * 格式[position.length+position+int+int]
+     * position.length=2
+     * @return
+     */
     private byte[] toBytes() {
         assert this.position.length > 0;
         int length = 2 + this.position.length + 2 * BytesBuffer.INT_LEN;
@@ -72,10 +95,20 @@ public class PageState {
         return buffer.bytes();
     }
 
+    /**
+     * page 的字符串形式。base64加密
+     * @param page
+     * @return
+     */
     public static PageState fromString(String page) {
         return fromBytes(toBytes(page));
     }
 
+    /**
+     * bytes 格式[position.length+position+int+int]
+     * @param bytes page信息
+     * @return
+     */
     public static PageState fromBytes(byte[] bytes) {
         if (bytes.length == 0) {
             // The first page
@@ -83,6 +116,7 @@ public class PageState {
         }
         try {
             BytesBuffer buffer = BytesBuffer.wrap(bytes);
+            //position+offset+total
             return new PageState(buffer.readBytes(), buffer.readInt(),
                                  buffer.readInt());
         } catch (Exception e) {

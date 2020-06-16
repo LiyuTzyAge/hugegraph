@@ -10,12 +10,14 @@ package com.baidu.hugegraph.backend.store;
  * Reading data from a given shard does not cross multiple nodes.
  *
  * 为了范围扫描提供优化，将相邻数据放在同一个node，防止扫描过多nodes
+ * shard代表一个node的范围
+ * 使用场景：元数据id扫描，Condition.scan
  */
 public class Shard {
 
-    // token range start
+    // token range start =int
     private String start;
-    // token range end
+    // token range end =int
     private String end;
     // partitions count in this range
     private long length;

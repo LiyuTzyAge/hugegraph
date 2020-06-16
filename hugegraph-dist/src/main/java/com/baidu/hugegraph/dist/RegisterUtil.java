@@ -41,6 +41,8 @@ import com.baidu.hugegraph.version.CoreVersion;
 
 /**
  * 插件注册管理工具
+ * 根据默认配置 注册 store （conf、Serializer、storeProvider）
+ * 注册 plugin
  */
 public class RegisterUtil {
 
@@ -59,7 +61,7 @@ public class RegisterUtil {
                      "Can't read file '%s' as stream", confFile);
 
         PropertiesConfiguration props = new PropertiesConfiguration();
-        props.setDelimiterParsingDisabled(true);
+        props.setDelimiterParsingDisabled(true);   //禁用分隔符
         try {
             props.load(input);
         } catch (ConfigurationException e) {
@@ -67,12 +69,17 @@ public class RegisterUtil {
         }
 
         HugeConfig config = new HugeConfig(props);
+        //backend.properties中定义的所有后端类型
         List<String> backends = config.get(DistOptions.BACKENDS);
         for (String backend : backends) {
             registerBackend(backend);
         }
     }
 
+    /**
+     * 将store的conf、Serializer、StoreProvider 注册到内存中
+     * @param backend
+     */
     private static void registerBackend(String backend) {
         switch (backend) {
             case "cassandra":
@@ -185,6 +192,9 @@ public class RegisterUtil {
                 "com.baidu.hugegraph.backend.store.postgresql.PostgresqlStoreProvider");
     }
 
+    /**
+     * 注册rest-server 配置信息
+     */
     public static void registerServer() {
         OptionSpace.register("server", "com.baidu.hugegraph.config.ServerOptions");
     }

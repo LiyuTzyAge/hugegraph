@@ -33,10 +33,13 @@ import com.baidu.hugegraph.type.HugeType;
 import com.baidu.hugegraph.util.E;
 import com.baidu.hugegraph.util.Log;
 
+/**
+ * 描述后端store的版本信息，~backend_info信息会保存在PK表中
+ */
 public class BackendStoreSystemInfo {
 
     private static final Logger LOG = Log.logger(HugeGraph.class);
-
+    //PK表中name="~backend_info"，value={"version":"1.6"}
     private static final String PK_BACKEND_INFO = Hidden.hide("backend_info");
 
     private final HugeGraph graph;
@@ -45,6 +48,9 @@ public class BackendStoreSystemInfo {
         this.graph = graph;
     }
 
+    /**
+     * 初始化 counter与store信息
+     */
     public synchronized void init() {
         SchemaTransaction schema = this.graph.schemaTransaction();
 
@@ -55,6 +61,7 @@ public class BackendStoreSystemInfo {
         E.checkState(this.info() == null,
                      "Already exists backend info of graph '%s' in backend " +
                      "'%s'", this.graph.name(), this.graph.backend());
+        //将store version写入到PK表中
         // Use property key to store backend version
         String backendVersion = this.graph.backendVersion();
         PropertyKey backendInfo = this.graph.schema()
@@ -64,10 +71,15 @@ public class BackendStoreSystemInfo {
         schema.addPropertyKey(backendInfo);
     }
 
+    /**
+     * 查询 store backend info
+     * @return
+     */
     private Map<String, Object> info() {
         SchemaTransaction schema = this.graph.schemaTransaction();
         PropertyKey pkey;
         try {
+            //查询pk表的 backend_info行
             pkey = schema.getPropertyKey(PK_BACKEND_INFO);
         } catch (IllegalStateException e) {
             String message = String.format(
@@ -84,6 +96,10 @@ public class BackendStoreSystemInfo {
         return pkey != null ? pkey.userdata() : null;
     }
 
+    /**
+     * 后端表是否创建，info信息是否存在
+     * @return
+     */
     public boolean exists() {
         if (!this.graph.schemaTransaction().store().initialized()) {
             return false;

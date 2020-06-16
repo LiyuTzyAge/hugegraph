@@ -485,7 +485,7 @@ public class Query implements Cloneable {
     }
 
     /**
-     * 单次query结果上限
+     * 单次query查询上限
      * @param count 查询结果数量
      * @throws LimitExceedException
      */

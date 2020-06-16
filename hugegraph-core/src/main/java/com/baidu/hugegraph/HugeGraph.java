@@ -166,6 +166,7 @@ public class HugeGraph implements GremlinGraph {
         return this.storeProvider.type();
     }
 
+    //backendVersion
     public String backendVersion() {
         return this.storeProvider.version();
     }
@@ -203,6 +204,10 @@ public class HugeGraph implements GremlinGraph {
 
     /**
      * 初始化store，不同store映射不同的tables
+     * schemaStore->m store
+     * systemStore->s store
+     * graphStore->g store
+     * 不同store管理不同的数据表
      */
     @Override
     public void initBackend() {
@@ -210,8 +215,8 @@ public class HugeGraph implements GremlinGraph {
         this.loadSystemStore().open(this.configuration);
         this.loadGraphStore().open(this.configuration);
         try {
-            this.storeProvider.init();
-            this.storeProvider.initSystemInfo(this);
+            this.storeProvider.init();  //init table
+            this.storeProvider.initSystemInfo(this); //info
         } finally {
             this.loadGraphStore().close();
             this.loadSystemStore().close();
@@ -314,6 +319,7 @@ public class HugeGraph implements GremlinGraph {
 
     /**
      * store = m
+     * 初始化 schema store
      * @return
      */
     public BackendStore loadSchemaStore() {
@@ -323,6 +329,7 @@ public class HugeGraph implements GremlinGraph {
 
     /**
      * store = g
+     * 初始化 schema store
      * @return
      */
     public BackendStore loadGraphStore() {
@@ -332,6 +339,7 @@ public class HugeGraph implements GremlinGraph {
 
     /**
      * store = s
+     * 初始化 schema store
      * @return
      */
     public BackendStore loadSystemStore() {
@@ -653,13 +661,16 @@ public class HugeGraph implements GremlinGraph {
 
     /**
      * Stop all the daemon threads
+     * =（消息中心+task异步任务）？
      * @param timeout seconds
      */
     public static void shutdown(long timeout) {
         try {
+            //关闭消息中心线程池
             if (!EventHub.destroy(timeout)) {
                 throw new TimeoutException(timeout + "s");
             }
+            //关闭huge异步任务
             TaskManager.instance().shutdown(timeout);
         } catch (Throwable e) {
             LOG.error("Error while shutdown", e);

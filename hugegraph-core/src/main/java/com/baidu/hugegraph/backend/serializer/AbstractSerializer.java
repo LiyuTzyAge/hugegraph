@@ -56,10 +56,31 @@ public abstract class AbstractSerializer
      */
     protected abstract Id writeQueryId(HugeType type, Id id);
 
+    /**
+     * 对Edge id的Condition 做序列化，根据condition 组合成EdgeId的一部分，做Range或Prefix查询
+     * @param query
+     * @return
+     */
     protected abstract Query writeQueryEdgeCondition(Query query);
 
+    /**
+     * 索引condition条件查询
+     * 创建索引 等值匹配 ->IdPrefixQuery
+     * 创建索引 范围匹配 ->IdRrangeQuery
+     * @param query
+     * @return
+     */
     protected abstract Query writeQueryCondition(Query query);
 
+    /**
+     * query序列化
+     * condition 是与rowkey相关的条件
+     * 查询方式：
+     * IdQuery =》vertex ，edge
+     * condition=》IdPrefix、IdRange=》edge、index
+     * @param query
+     * @return
+     */
     @Override
     public Query writeQuery(Query query) {
         HugeType type = query.resultType();
@@ -78,18 +99,19 @@ public abstract class AbstractSerializer
             }
         }
 
-        //id查询
+        //id查询[vretex+id/edge+id]
         // Serialize id in query
         if (query instanceof IdQuery && !query.ids().isEmpty()) {
             IdQuery result = (IdQuery) query.copy();
             result.resetIds();
             for (Id id : query.ids()) {
+                //serialize id
                 result.query(this.writeQueryId(type, id));
             }
             query = result;
         }
 
-        //Query查询
+        //QueryCondition查询 [index+condition]
         // Serialize condition(key/value) in query
         if (query instanceof ConditionQuery && !query.conditions().isEmpty()) {
             query = this.writeQueryCondition(query);

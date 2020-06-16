@@ -88,7 +88,8 @@ public abstract class AbstractTransaction implements Transaction {
     }
 
     /**
-     * 执行查询，底层原始查询，为优化
+     * 执行查询，底层原始查询，未优化
+     * 基于id的查询
      * @param query
      * @return
      */

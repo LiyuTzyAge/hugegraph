@@ -41,6 +41,10 @@ import com.baidu.hugegraph.type.Idfiable;
 import com.baidu.hugegraph.util.E;
 import com.baidu.hugegraph.util.InsertionOrderUtil;
 
+/**
+ * 不执行查询，返回查询结果Iterator<BackendEntry>的封装
+ * 不保存数据，会将结果存到map中:fillMap
+ */
 public class QueryResults {
 
     private static final Iterator<?> EMPTY_ITERATOR = new EmptyIterator<>();
@@ -99,7 +103,9 @@ public class QueryResults {
 
     /**
      * 返回结果的Iterator
-     * 对分页情况，根据输入排序等进行顺序返回
+     * 确认是否需要对结果排序。
+     * 排序：MapperIterator
+     * 不排序：直接返回结果
      * @param origin
      * @param <T>
      * @return
@@ -111,6 +117,7 @@ public class QueryResults {
             return origin;
         }
         Set<Id> ids;
+        //不排序场景
         if (!this.mustSortByInputIds() || this.paging() ||
             (ids = this.queryIds()).size() <= 1) {
             /*
@@ -123,7 +130,7 @@ public class QueryResults {
         // Fill map with all elements
         Map<Id, T> map = new HashMap<>();
         QueryResults.fillMap(origin, map);
-
+        //sort
         return new MapperIterator<>(ids.iterator(), id -> {
             return map.get(id);
         });
@@ -164,7 +171,7 @@ public class QueryResults {
     }
 
     /**
-     * 返回所有query中相关的ids
+     * 返回所有query中相关的ids，并保证顺序
      * @return
      */
     private Set<Id> queryIds() {
@@ -224,6 +231,8 @@ public class QueryResults {
     }
 
     /**
+     * 执行查询
+     * 迭代处理iterator中的每个query，执行func查询底层实际数据
      * 返回FlatMapperIterator处理过的QueryResults
      * @param iterator
      * @param func

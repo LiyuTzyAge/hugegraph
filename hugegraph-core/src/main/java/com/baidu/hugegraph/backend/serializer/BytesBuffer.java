@@ -47,8 +47,8 @@ import com.baidu.hugegraph.util.StringEncoding;
 public final class BytesBuffer {
 
     public static final int BYTE_LEN = Byte.BYTES;  //字节长度 1
-    public static final int SHORT_LEN = Short.BYTES;
-    public static final int INT_LEN = Integer.BYTES;
+    public static final int SHORT_LEN = Short.BYTES;    //2byte
+    public static final int INT_LEN = Integer.BYTES;    //4byte
     public static final int LONG_LEN = Long.BYTES;
     public static final int CHAR_LEN = Character.BYTES;
     public static final int FLOAT_LEN = Float.BYTES;
@@ -289,6 +289,10 @@ public final class BytesBuffer {
         return this.buffer.getShort();
     }
 
+    /**
+     * 4byte
+     * @return
+     */
     public int readInt() {
         return this.buffer.getInt();
     }

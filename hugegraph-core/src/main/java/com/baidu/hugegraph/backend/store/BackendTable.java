@@ -69,6 +69,7 @@ public abstract class BackendTable<Session extends BackendSession, Entry> {
      * @return corresponding table type
      */
     public static HugeType tableType(Query query) {
+        //type is vertex or edge
         HugeType type = query.resultType();
 
         // Mapping EDGE to EDGE_OUT/EDGE_IN
@@ -184,7 +185,7 @@ public abstract class BackendTable<Session extends BackendSession, Entry> {
         public final String position(long position) {
             return String.valueOf(position);
         }
-
+        //position must int
         public final byte[] position(String position) {
             int value = Long.valueOf(position).intValue();
             return NumericUtil.intToBytes(value);

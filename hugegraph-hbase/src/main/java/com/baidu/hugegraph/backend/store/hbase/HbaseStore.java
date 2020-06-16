@@ -221,11 +221,17 @@ public abstract class HbaseStore extends AbstractBackendStore<Session> {
         }
     }
 
+    /**
+     * 查询底层数据
+     * @param query
+     * @return
+     */
     @Override
     public Iterator<BackendEntry> query(Query query) {
         this.checkOpened();
 
         Session session = this.sessions.session();
+        //vertex or edge_out/edge_in
         HbaseTable table = this.table(HbaseTable.tableType(query));
         return table.query(session, query);
     }
@@ -310,6 +316,10 @@ public abstract class HbaseStore extends AbstractBackendStore<Session> {
         LOG.debug("Store cleared: {}", this.store);
     }
 
+    /**
+     * 是否初始化 检查namespace与table是否存在
+     * @return
+     */
     @Override
     public boolean initialized() {
         this.checkConnectionOpened();
@@ -469,7 +479,7 @@ public abstract class HbaseStore extends AbstractBackendStore<Session> {
         public HbaseGraphStore(BackendStoreProvider provider,
                                String namespace, String store) {
             super(provider, namespace, store);
-
+            //注册table
             registerTableManager(HugeType.VERTEX,
                                  new HbaseTables.Vertex(store));
 

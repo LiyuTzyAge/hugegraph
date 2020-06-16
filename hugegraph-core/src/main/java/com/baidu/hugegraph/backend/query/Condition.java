@@ -288,6 +288,12 @@ public abstract class Condition {
         return new SyspropRelation(key, RelationType.CONTAINS_KEY, value);
     }
 
+    /**
+     * 元数据扫描
+     * @param start
+     * @param end
+     * @return
+     */
     public static Condition scan(String start, String end) {
         Shard value = new Shard(start, end, 0);
         return new SyspropRelation(HugeKeys.ID, RelationType.SCAN, value);

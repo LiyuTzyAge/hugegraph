@@ -169,7 +169,7 @@ public final class CachedGraphTransaction extends GraphTransaction {
      * @return
      */
     private Iterator<HugeVertex> queryVerticesByIds(IdQuery query) {
-        //用于保存缓存中不存在的ids
+        //用于保存缓存中不存在的ids,最后进行底层查询
         IdQuery newQuery = new IdQuery(HugeType.VERTEX, query);
         List<HugeVertex> vertices = new ArrayList<>();
         for (Id vertexId : query.ids()) {

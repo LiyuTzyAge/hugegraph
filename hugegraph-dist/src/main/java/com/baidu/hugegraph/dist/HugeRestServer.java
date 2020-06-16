@@ -46,11 +46,21 @@ public class HugeRestServer {
         LOG.info("HugeRestServer stopped");
     }
 
+    /**
+     * 注册
+     */
     public static void register() {
         RegisterUtil.registerBackends();
         RegisterUtil.registerPlugins();
     }
 
+    /**
+     *
+     * 注册rest server 配置，启动server
+     * @param conf
+     * @return
+     * @throws Exception
+     */
     public static RestServer start(String conf) throws Exception {
         RegisterUtil.registerServer();
 

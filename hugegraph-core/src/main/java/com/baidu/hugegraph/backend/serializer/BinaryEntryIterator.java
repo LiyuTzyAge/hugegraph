@@ -155,6 +155,10 @@ public class BinaryEntryIterator<Elem> extends BackendEntryIterator {
         return e.columnsSize();
     }
 
+    /**
+     * 使用当前数据的position，生成pageState信息
+     * @return
+     */
     @Override
     protected PageState pageState() {
         byte[] position = this.results.position();

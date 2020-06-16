@@ -53,6 +53,7 @@ public class RestServer {
 
     public void start() throws IOException {
         String url = this.conf.get(ServerOptions.REST_SERVER_URL);
+        //restserver.url=http://0.0.0.0:8080
         URI uri = UriBuilder.fromUri(url).build();
 
         ResourceConfig rc = new ApplicationConfig(this.conf);
@@ -67,6 +68,12 @@ public class RestServer {
         this.calcMaxWriteThreads();
     }
 
+    /**
+     * 配置HttpServer
+     * @param uri
+     * @param rc
+     * @return
+     */
     private HttpServer configHttpServer(URI uri, ResourceConfig rc) {
         HttpServer server = GrizzlyHttpServerFactory.createHttpServer(uri, rc,
                                                                       false);
@@ -105,6 +112,12 @@ public class RestServer {
         this.httpServer.shutdownNow();
     }
 
+    /**
+     * 启动rest server
+     * @param conf
+     * @return
+     * @throws Exception
+     */
     public static RestServer start(String conf) throws Exception {
         LOG.info("RestServer starting...");
         ApiVersion.check();
@@ -116,6 +129,10 @@ public class RestServer {
         return server;
     }
 
+    /**
+     * 计算最大写线程数，并更改到HugeConf中
+     * 默认值=MAX_WORKER_THREADS* MAX_WRITE_RATIO/ 100
+     */
     private void calcMaxWriteThreads() {
         int maxWriteThreads = this.conf.get(ServerOptions.MAX_WRITE_THREADS);
         if (maxWriteThreads > 0) {

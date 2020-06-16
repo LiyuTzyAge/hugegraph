@@ -24,6 +24,9 @@ import static com.baidu.hugegraph.config.OptionChecker.nonNegativeInt;
 import static com.baidu.hugegraph.config.OptionChecker.positiveInt;
 import static com.baidu.hugegraph.config.OptionChecker.rangeInt;
 
+/**
+ * rest-server.properties
+ */
 public class ServerOptions extends OptionHolder {
 
     private ServerOptions() {

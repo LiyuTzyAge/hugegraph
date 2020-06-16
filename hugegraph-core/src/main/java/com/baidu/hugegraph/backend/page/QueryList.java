@@ -35,13 +35,22 @@ import com.baidu.hugegraph.backend.store.BackendEntry;
 import com.baidu.hugegraph.util.Bytes;
 import com.baidu.hugegraph.util.E;
 
+/**
+ * 将一个Query拆分成多个subQuery,并组合在一起(add)，执行底层查询
+ * 拆分实现：ConditionQueryFlatten.flatten
+ */
 public final class QueryList {
-
+    //原始query
     private final Query parent;
     // The size of each page fetched by the inner page
     private final Function<Query, QueryResults> fetcher;
     private final List<FlattenQuery> queries;
 
+    /**
+     * query到返回结果的过程封装
+     * @param parent 原始query，未经过Condition拆分的
+     * @param fetcher query在底层执行函数，返回查询结果，用于
+     */
     public QueryList(Query parent, Function<Query, QueryResults> fetcher) {
         this.parent = parent;
         this.fetcher = fetcher;
@@ -56,6 +65,11 @@ public final class QueryList {
         return this.fetcher;
     }
 
+    /**
+     * 添加subQuery
+     * @param holders
+     * @param indexBatchSize
+     */
     public void add(IdHolderList holders, long indexBatchSize) {
         // IdHolderList is results of one index query, the query is flattened
         this.queries.add(new IndexQuery(holders, indexBatchSize));
@@ -84,26 +98,47 @@ public final class QueryList {
                              this.parent, this.queries);
     }
 
+    /**
+     * 执行底层查询
+     * 如果是分页查询会返回PageEntryIterator
+     * 如果非分页查询，直接查询底层数据
+     * @param pageSize
+     * @return
+     */
     public QueryResults fetch(int pageSize) {
         assert !this.queries.isEmpty();
         if (this.parent.paging()) {
+            //分页查询模式
             @SuppressWarnings("resource") // closed by QueryResults
             PageEntryIterator iterator = new PageEntryIterator(this, pageSize);
             /*
              * NOTE: PageEntryIterator query will change every fetch time.
              * TODO: sort results by input ids in each page.
              */
+            //执行分页查询，返回分页查询的结果
             return iterator.results();
         }
 
+        /*
+         List<FlattenQuery>-->q.iterator() 对每一个FlattenQuery 分别执行
+         q.iterator() 执行实际底层查询
+          */
         // Fetch all results once
         return QueryResults.flatMap(this.queries.iterator(), q -> q.iterator());
     }
 
+    /**
+     * 根据PageInfo执行查询，返回结果，结果中的PageState会被更新
+     * 用于PageEntryIterator 分页查询场景中
+     * @param pageInfo
+     * @param pageSize
+     * @return
+     */
     protected PageResults fetchNext(PageInfo pageInfo, long pageSize) {
         FlattenQuery query = null;
         int offset = pageInfo.offset();
         int visited = 0;
+        //找到还未执行的subQuery
         // Find the first FlattenQuery not visited
         for (FlattenQuery q : this.queries) {
             if (visited + q.total() > offset) {
@@ -118,6 +153,7 @@ public final class QueryList {
         }
         E.checkNotNull(query, "query");
         assert offset >= visited;
+        //执行查询，更新PageState.position
         return query.iterator(offset - visited, pageInfo.page(), pageSize);
     }
 
@@ -141,6 +177,10 @@ public final class QueryList {
          */
         public PageResults iterator(int index, String page, long pageSize);
 
+        /**
+         * 下级subQuery数量
+         * @return
+         */
         public int total();
     }
 
@@ -161,6 +201,13 @@ public final class QueryList {
             return fetcher().apply(this.query);
         }
 
+        /**
+         * 执行查询，生成新的PageState信息，更新Position
+         * @param index     position IdHolder(Query)
+         * @param page      set query page
+         * @param pageSize  set query page size
+         * @return
+         */
         @Override
         public PageResults iterator(int index, String page, long pageSize) {
             // Iterate by paging
@@ -174,13 +221,19 @@ public final class QueryList {
 
             QueryResults results = fetcher().apply(query);
 
+            //将结果由iterate转换为List
             // Must iterate all entries before get the next page state
             QueryResults fetched = results.toList();
+            //生成新的PageState信息
             PageState pageState = PageInfo.pageState(results.iterator());
 
             return new PageResults(fetched, pageState);
         }
 
+        /**
+         * 最底层subQuery，不可再分
+         * @return
+         */
         @Override
         public int total() {
             return 1;
@@ -194,6 +247,7 @@ public final class QueryList {
 
     /**
      * Generate queries from tx.indexQuery()
+     * 索引查询实例
      */
     private class IndexQuery implements FlattenQuery {
 
@@ -255,11 +309,19 @@ public final class QueryList {
             });
         }
 
+        /**
+         * 索引分页查询
+         * @param index     position IdHolder(Query);多个subQuery的某一个
+         * @param page      set query page
+         * @param pageSize  set query page size
+         * @return
+         */
         @Override
         public PageResults iterator(int index, String page, long pageSize) {
             // Iterate by paging
             E.checkArgument(0 <= index && index <= this.holders.size(),
                             "Invalid page index %s", index);
+            //选择对应index的subQuery
             IdHolder holder = this.holders.get(index);
             PageIds pageIds = holder.fetchNext(page, pageSize);
             if (pageIds.empty()) {
@@ -272,6 +334,10 @@ public final class QueryList {
             return new PageResults(results, pageIds.pageState());
         }
 
+        /**
+         * subQuery个数
+         * @return
+         */
         @Override
         public int total() {
             return this.holders.size();
@@ -283,6 +349,9 @@ public final class QueryList {
         }
     }
 
+    /**
+     * 将结果与PageState封装到一起
+     */
     public static class PageResults {
 
         public static final PageResults EMPTY = new PageResults(
@@ -290,6 +359,7 @@ public final class QueryList {
                                                 PageState.EMPTY);
 
         private final QueryResults results;
+        //查询结果的分页信息
         private final PageState pageState;
 
         public PageResults(QueryResults results, PageState pageState) {
@@ -301,9 +371,13 @@ public final class QueryList {
             return this.results.iterator();
         }
 
+        /**
+         * 是否还有下一个page，如果position==EMPTY_BYTES,则认为是最后一页
+         * @return
+         */
         public boolean hasNextPage() {
             return !Bytes.equals(this.pageState.position(),
-                                 PageState.EMPTY_BYTES);
+                    PageState.EMPTY_BYTES);
         }
 
         public Query query() {
@@ -317,6 +391,10 @@ public final class QueryList {
             return this.pageState.toString();
         }
 
+        /**
+         * 当前数据总量
+         * @return
+         */
         public long total() {
             return this.pageState.total();
         }

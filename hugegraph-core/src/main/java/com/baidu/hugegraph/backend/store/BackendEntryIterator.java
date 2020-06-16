@@ -83,6 +83,13 @@ public abstract class BackendEntryIterator implements CIter<BackendEntry> {
         return current;
     }
 
+    /**
+     * 根据meta信息，生成对应的数据类型
+     * PAGE 为生成 pageState
+     * @param meta
+     * @param args
+     * @return
+     */
     @Override
     public Object metadata(String meta, Object... args) {
         if (PageInfo.PAGE.equals(meta)) {

@@ -35,10 +35,20 @@ public class Text extends P<Object> {
         super(predicate, value);
     }
 
+    /**
+     * 根据value生成，关于value的计算函数(contains)
+     * @param value
+     * @return
+     */
     public static Text contains(String value) {
         return new Text(RelationType.TEXT_CONTAINS, value);
     }
 
+    /**
+     * 生成uuid vertexId
+     * @param id
+     * @return
+     */
     public static Id uuid(String id) {
         return IdGenerator.of(id, true);
     }

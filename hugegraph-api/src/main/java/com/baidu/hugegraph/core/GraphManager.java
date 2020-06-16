@@ -74,7 +74,9 @@ public final class GraphManager {
 
         this.loadGraphs(conf.getMap(ServerOptions.GRAPHS));
         // this.installLicense(conf, "");
+        //initBackend 并且检查 BackendStoreSystemInfo信息
         this.checkBackendVersionOrExit();
+        //加载异步任务task信息
         this.restoreUncompletedTasks();
         this.addMetrics(conf);
     }
@@ -192,6 +194,9 @@ public final class GraphManager {
         }
     }
 
+    /**
+     * initBackend 并且检查 BackendStoreSystemInfo信息
+     */
     private void checkBackendVersionOrExit() {
         for (String graph : this.graphs()) {
             // TODO: close tx from main thread
@@ -214,6 +219,9 @@ public final class GraphManager {
         }
     }
 
+    /**
+     * 加载未完成的task数据，会读取PK表寻找元数据信息
+     */
     private void restoreUncompletedTasks() {
         for (String graph : this.graphs()) {
             HugeGraph hugegraph = this.graph(graph);

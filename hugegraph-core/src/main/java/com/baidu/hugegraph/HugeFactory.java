@@ -35,19 +35,29 @@ import com.baidu.hugegraph.util.E;
 public class HugeFactory {
 
     private static final String NAME_REGEX = "^[A-Za-z][A-Za-z0-9_]{0,47}$";
-
+    //缓存JVM中所有的HugeGraph实例 <graphName,HugeGraph>
+    //graphName= hugegraph.properties.store
     private static final Map<String, HugeGraph> graphs = new HashMap<>();
 
+    /**
+     * 创建HugeGraph或返回缓存中的相同graphName的HugeGraph实例
+     * @param config hugegraph.properties
+     * @return
+     */
     public static synchronized HugeGraph open(Configuration config) {
         HugeConfig conf = new HugeConfig(config);
+        //The database name like Cassandra Keyspace.
         String name = conf.get(CoreOptions.STORE);
         checkGraphName(name, "graph config(like hugegraph.properties)");
         name = name.toLowerCase();
+        //store.graphName <--> hugegraph
         HugeGraph graph = graphs.get(name);
         if (graph == null || graph.closed()) {
             graph = new HugeGraph(conf);
             graphs.put(name, graph);
         } else {
+            //确认 backend 类型是否相同
+            //like hbase/mysql
             String backend = conf.get(CoreOptions.BACKEND);
             E.checkState(backend.equalsIgnoreCase(graph.backend()),
                          "Graph name '%s' has been used by backend '%s'",

@@ -40,7 +40,7 @@ import com.baidu.hugegraph.util.Log;
 public class InitStore {
 
     private static final Logger LOG = Log.logger(InitStore.class);
-
+    //所有的graph name
     private static final String GRAPHS = ServerOptions.GRAPHS.name();
     // 6~8 retries may be needed under high load for Cassandra backend
     private static final int RETRIES = 10;
@@ -65,7 +65,7 @@ public class InitStore {
         E.checkArgument(args[0].endsWith(".yaml"),
                         "Init store only accept yaml config file.");
 
-        String confFile = args[0];
+        String confFile = args[0];  //gremlin-server.yaml
         RegisterUtil.registerBackends();
         RegisterUtil.registerPlugins();
 
@@ -84,10 +84,12 @@ public class InitStore {
                         "Must contain at least one graph");
 
         for (ConfigurationNode graphName : graphNames) {
+            //graphname
             @SuppressWarnings("unchecked")
             String name = ((Map.Entry<String, Object>)
                            graphName.getReference()).getKey();
             HugeFactory.checkGraphName(name, "gremlin-server.yaml");
+            //hugegraph.properties
             String configPath = graphName.getValue().toString();
             initGraph(configPath);
         }
@@ -115,7 +117,7 @@ public class InitStore {
 
     private static void initBackend(final HugeGraph graph)
                                     throws InterruptedException {
-        int retries = RETRIES;
+        int retries = RETRIES;  //10
         retry: do {
             try {
                 graph.initBackend();

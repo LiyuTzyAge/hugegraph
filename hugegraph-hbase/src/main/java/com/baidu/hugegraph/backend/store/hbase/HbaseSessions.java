@@ -335,6 +335,8 @@ public class HbaseSessions extends BackendSessionPool {
 
     /**
      * Session for HBase
+     * 提供批量数据写入功能
+     * 批量缓存的commit/rollback实现事务读写功能
      */
     public final class Session extends BackendSession {
         //缓存未提交的action。<tablename,List<action>>

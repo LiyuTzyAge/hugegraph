@@ -46,6 +46,9 @@ public class ContextGremlinServer extends GremlinServer {
         super(settings, newGremlinExecutorService(settings));
     }
 
+    /**
+     * 为hugegraph封装 Context用户认证功能
+     */
     public void injectAuthGraph() {
         HugeGraphAuthProxy.setContext(Context.admin());
 
@@ -59,11 +62,13 @@ public class ContextGremlinServer extends GremlinServer {
     }
 
     /**
+     * 缓存 gName--GraphTraversalSource 到Map中
      * traversal与graph绑定，使用prefix名称与graph名称组合的方式，生成全局唯一名称
      * gName全局名称，绑定g与graph
-     * @param prefix 前缀
+     * @param prefix 前缀 __g_
      */
     public void injectTraversalSource(String prefix) {
+        //GraphManager = DefaultGraphManager
         GraphManager manager = this.getServerGremlinExecutor()
                                    .getGraphManager();
         for (String graph : manager.getGraphNames()) {
@@ -76,6 +81,10 @@ public class ContextGremlinServer extends GremlinServer {
             }
             // Add a traversal source for all graphs with customed rule.
             manager.putTraversalSource(gName, g);   //别名与g绑定
+            /*
+                Map<String, Graph> graphs = new ConcurrentHashMap<>();
+                Map<String, TraversalSource> traversalSources = new ConcurrentHashMap<>();
+             */
         }
     }
 
@@ -89,6 +98,7 @@ public class ContextGremlinServer extends GremlinServer {
             settings.gremlinPool = Runtime.getRuntime().availableProcessors();
         }
         int size = settings.gremlinPool;
+        //创建线程工厂
         ThreadFactory factory = ThreadFactoryUtil.create("exec-%d");
         return new ContextThreadPoolExecutor(size, size, factory);
     }

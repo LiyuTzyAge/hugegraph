@@ -32,6 +32,7 @@ public class IdQuery extends Query {
 
     // The id(s) will be concated with `or`
     private Set<Id> ids = InsertionOrderUtil.newSet();
+    //是否根据ids顺序，排序查询结果
     private boolean mustSortByInput = true;
 
     public IdQuery(HugeType resultType) {

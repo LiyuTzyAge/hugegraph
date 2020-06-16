@@ -22,6 +22,8 @@ package com.baidu.hugegraph.backend.store;
 import com.baidu.hugegraph.backend.store.BackendStore.TxState;
 
 /**
+ * session 状态信息
+ * 封装 session的 commit，rollback，open，close事务接口
  * interface Session for backend store
  */
 public abstract class BackendSession {
