@@ -62,9 +62,14 @@ public final class HugeVertexStep<E extends Element>
               originVertexStep.getReturnClass(),
               originVertexStep.getDirection(),
               originVertexStep.getEdgeLabels());
-        originVertexStep.getLabels().forEach(this::addLabel);
+        originVertexStep.getLabels().forEach(this::addLabel); //复制查询label
     }
 
+    /**
+     * 将查询vertex的traverser转换成查询 相关vertex或相关edge的iterator
+     * @param traverser
+     * @return
+     */
     @SuppressWarnings("unchecked")
     @Override
     protected Iterator<E> flatMap(final Traverser.Admin<Vertex> traverser) {
@@ -82,8 +87,15 @@ public final class HugeVertexStep<E extends Element>
         return results;
     }
 
+    /**
+     * 由traverser中的一个vertex查询相关的vertex
+     * 注：每次由一个vertex开始
+     * @param traverser
+     * @return
+     */
     private Iterator<Vertex> vertices(Traverser.Admin<Vertex> traverser) {
         HugeGraph graph = (HugeGraph) traverser.get().graph();
+        //traversal当前遍历到的vertex,作为出发点
         Vertex vertex = traverser.get();
 
         Iterator<Edge> edges = this.edges(traverser);
@@ -98,11 +110,17 @@ public final class HugeVertexStep<E extends Element>
         if (this.hasContainers.isEmpty()) {
             return vertices;
         }
-
+        //在内存中过滤结果
         // TODO: query by vertex index to optimize
         return TraversalUtil.filterResult(this.hasContainers, vertices);
     }
 
+    /**
+     * 由traverser中的一个vertex查询相关的edge
+     * 注：每次由一个vertex开始
+     * @param traverser
+     * @return
+     */
     private Iterator<Edge> edges(Traverser.Admin<Vertex> traverser) {
         HugeGraph graph = (HugeGraph) traverser.get().graph();
         List<HasContainer> conditions = this.hasContainers;
@@ -110,7 +128,7 @@ public final class HugeVertexStep<E extends Element>
         // Query for edge with conditions(else conditions for vertex)
         boolean withEdgeCond = Edge.class.isAssignableFrom(getReturnClass()) &&
                                !conditions.isEmpty();
-
+        //出发点
         Id vertex = (Id) traverser.get().id();
         Directions direction = Directions.convert(this.getDirection());
         String[] edgeLabels = this.getEdgeLabels();
@@ -120,7 +138,7 @@ public final class HugeVertexStep<E extends Element>
                   vertex, direction, edgeLabels, this.hasContainers);
 
         Id[] edgeLabelIds = graph.mapElName2Id(edgeLabels);
-
+        //生成edge查询ConditionQuery
         ConditionQuery query = GraphTransaction.constructEdgesQuery(
                                vertex, direction, edgeLabelIds);
         // Query by sort-keys

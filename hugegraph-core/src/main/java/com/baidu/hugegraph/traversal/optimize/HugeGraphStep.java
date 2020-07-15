@@ -49,7 +49,7 @@ public final class HugeGraphStep<S, E extends Element>
 
     // Store limit/order-by
     private final Query queryInfo = new Query(HugeType.UNKNOWN);
-
+    //自身的图iterator
     private Iterator<E> lastTimeResults = QueryResults.emptyIterator();
 
     public HugeGraphStep(final GraphStep<S, E> originGraphStep) {
@@ -57,12 +57,14 @@ public final class HugeGraphStep<S, E extends Element>
               originGraphStep.getReturnClass(),
               originGraphStep.isStartStep(),
               originGraphStep.getIds());
-
+        //复制labels
         originGraphStep.getLabels().forEach(this::addLabel);
 
         boolean queryVertex = this.returnsVertex();
         boolean queryEdge = this.returnsEdge();
         assert queryVertex || queryEdge;
+        //将V(),E() 转换成 hugegraph.vertices() 和hugegraph.edges()
+        //has执行 转换成 ConditionQuery
         this.setIteratorSupplier(() -> {
             Iterator<E> results = queryVertex ? this.vertices() : this.edges();
             this.lastTimeResults = results;
@@ -76,9 +78,11 @@ public final class HugeGraphStep<S, E extends Element>
         HugeGraph graph = (HugeGraph) this.getTraversal().getGraph().get();
         // g.V().hasId(EMPTY_LIST) will set ids to null
         if (this.ids == null) {
+            //g.V() ids!=null ,等于Object[0]
             return QueryResults.emptyIterator();
         }
         if (this.ids.length > 0) {
+            //根据id进行过滤
             return TraversalUtil.filterResult(this.hasContainers,
                                               graph.vertices(this.ids));
         }

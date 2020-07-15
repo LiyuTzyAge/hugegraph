@@ -46,22 +46,26 @@ public final class HugeGraphStepStrategy
     @Override
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public void apply(Traversal.Admin<?, ?> traversal) {
+        //校验HasStep
         TraversalUtil.convAllHasSteps(traversal);
 
         // Extract conditions in GraphStep
         List<GraphStep> steps = TraversalHelper.getStepsOfClass(
                                 GraphStep.class, traversal);
         for (GraphStep originStep : steps) {
+            //转换成 HugeGraphStep
             HugeGraphStep<?, ?> newStep = new HugeGraphStep<>(originStep);
+            //更新Graph traversal中的step
             TraversalHelper.replaceStep(originStep, newStep, traversal);
-
+            //转换或剔除hasStep
             TraversalUtil.extractHasContainer(newStep, traversal);
 
             // TODO: support order-by optimize
             // TraversalUtil.extractOrder(newStep, traversal);
 
+            //更新Range查询中的策略
             TraversalUtil.extractRange(newStep, traversal, false);
-
+            //更新count上级返回结果上限
             TraversalUtil.extractCount(newStep, traversal);
         }
     }

@@ -40,7 +40,9 @@ import com.baidu.hugegraph.util.E;
 public class Utils {
 
     public static final String CONF_PATH = "hugegraph.properties";
-
+//public static final String CONF_PATH="E:\\ideahouse\\hugeGraph\\master" +
+//        "\\hugegraph\\hugegraph-dist\\src\\assembly\\static\\conf\\hugegraph" +
+//        "-test.properties";
     public static HugeGraph open() {
         String confPath = System.getProperty("config_path");
         if (confPath == null || confPath.isEmpty()) {

@@ -76,6 +76,11 @@ import com.google.common.collect.ImmutableList;
 
 public final class TraversalUtil {
 
+    /**
+     * 将hasStep从GraphStep中转换或剔除掉
+     * @param newStep
+     * @param traversal
+     */
     public static void extractHasContainer(HugeGraphStep<?, ?> newStep,
                                            Traversal.Admin<?, ?> traversal) {
         Step<?, ?> step = newStep;
@@ -84,11 +89,14 @@ public final class TraversalUtil {
             if (step instanceof HasStep) {
                 HasContainerHolder holder = (HasContainerHolder) step;
                 for (HasContainer has : holder.getHasContainers()) {
+                    //是否能将has 转换成id查询
                     if (!GraphStep.processHasContainerIds(newStep, has)) {
                         newStep.addHasContainer(has);
                     }
                 }
+                //将has label 放到前一个step
                 TraversalHelper.copyLabels(step, step.getPreviousStep(), false);
+                //删除 step
                 traversal.removeStep(step);
             }
         } while (step instanceof HasStep || step instanceof NoOpBarrierStep);
@@ -133,6 +141,12 @@ public final class TraversalUtil {
                  step instanceof IdentityStep);
     }
 
+    /**
+     * 更新RangeGlobalStep 中的range策略
+     * @param newStep
+     * @param traversal
+     * @param extractOnlyLimit
+     */
     public static void extractRange(Step<?, ?> newStep,
                                     Traversal.Admin<?, ?> traversal,
                                     boolean extractOnlyLimit) {
@@ -166,6 +180,11 @@ public final class TraversalUtil {
                  step instanceof NoOpBarrierStep);
     }
 
+    /**
+     * 更新count上级返回结果上限
+     * @param newStep
+     * @param traversal
+     */
     public static void extractCount(Step<?, ?> newStep,
                                     Traversal.Admin<?, ?> traversal) {
         Step<?, ?> step = newStep;
@@ -181,6 +200,13 @@ public final class TraversalUtil {
                  step instanceof NoOpBarrierStep);
     }
 
+    /**
+     * 将 HasContainer 转换成 ConditionQuery
+     * @param hasContainers
+     * @param query
+     * @param graph
+     * @return
+     */
     public static ConditionQuery fillConditionQuery(
                                  List<HasContainer> hasContainers,
                                  ConditionQuery query,
@@ -194,6 +220,13 @@ public final class TraversalUtil {
         return query;
     }
 
+    /**
+     * 对has查询进行转换，hugegraph强制要求has查询索引
+     * @param has
+     * @param type
+     * @param graph
+     * @return
+     */
     public static Condition convHas2Condition(HasContainer has,
                                               HugeType type,
                                               HugeGraph graph) {
@@ -454,6 +487,13 @@ public final class TraversalUtil {
         return key.equals(T.value.getAccessor());
     }
 
+    /**
+     * 查询出来的结果进行过滤 has
+     * @param hasContainers
+     * @param iterator
+     * @param <V>
+     * @return
+     */
     @SuppressWarnings("unchecked")
     public static <V> Iterator<V> filterResult(
                                   List<HasContainer> hasContainers,
@@ -464,6 +504,10 @@ public final class TraversalUtil {
         return (Iterator<V>) result;
     }
 
+    /**
+     * 检查has中value的类型是否与定义相同，并将其类型转换为Object
+     * @param traversal
+     */
     public static void convAllHasSteps(Traversal.Admin<?, ?> traversal) {
         // Extract all has steps in traversal
         @SuppressWarnings("rawtypes")
@@ -483,6 +527,11 @@ public final class TraversalUtil {
         }
     }
 
+    /**
+     * 检查has中value的类型是否与定义相同，并将其类型转换为Object
+     * @param graph
+     * @param has
+     */
     private static void convPredicateValue(HugeGraph graph, HasContainer has) {
         // No need to convert if key is sysprop
         if (isSysProp(has.getKey())) {
@@ -491,8 +540,10 @@ public final class TraversalUtil {
         PropertyKey pkey = graph.propertyKey(has.getKey());
 
         List<P<Object>> leafPredicates = new ArrayList<>();
+        //has.getPredicate = value
         collectPredicates(leafPredicates, ImmutableList.of(has.getPredicate()));
         for (P<Object> predicate : leafPredicates) {
+            //检查属性类型
             Object value = validPredicateValue(predicate.getValue(), pkey);
             predicate.setValue(value);
         }
@@ -512,11 +563,17 @@ public final class TraversalUtil {
         }
     }
 
+    /**
+     * 将predicates中的元素转换Object写入到results
+     * @param results
+     * @param predicates
+     */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static void collectPredicates(List<P<Object>> results,
                                           List<P<?>> predicates) {
         for (P<?> p : predicates) {
             if (p instanceof ConnectiveP) {
+                //符合结构：list、set
                 collectPredicates(results, ((ConnectiveP) p).getPredicates());
             } else {
                 results.add((P<Object>) p);
@@ -565,6 +622,13 @@ public final class TraversalUtil {
         return order == Order.desc ? Query.Order.DESC : Query.Order.ASC;
     }
 
+    /**
+     * 检查属性类型
+     * @param value
+     * @param pkey
+     * @param <V>
+     * @return
+     */
     private static <V> V validPredicateValue(V value, PropertyKey pkey) {
         V validValue = pkey.convValue(value, false);
         E.checkArgumentNotNull(validValue,

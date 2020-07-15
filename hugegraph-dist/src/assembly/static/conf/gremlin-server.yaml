@@ -3,7 +3,7 @@
 #port: 8182
 
 # timeout in ms of gremlin query
-scriptEvaluationTimeout: 30000
+scriptEvaluationTimeout: 3000000
 
 # If you want to start gremlin-server for gremlin-console(web-socket),
 # please change `HttpChannelizer` to `WebSocketChannelizer` or comment this line.
